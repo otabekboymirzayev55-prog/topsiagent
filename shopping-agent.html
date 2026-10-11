@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TopAgent</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080810;
+    --surface: #0f0f1a;
+    --surface2: #16162a;
+    --border: rgba(255,255,255,0.07);
+    --accent: #5b7fff;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --red: #f87171;
+    --text: #e8e8f0;
+    --muted: #6b6b85;
+    --card-bg: #11111e;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: grid; place-items: center;
+    font-size: 16px;
+  }
+  .logo-name {
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.3px;
+  }
+  .logo-name span { color: var(--accent); }
+  .status-pill {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* MAIN LAYOUT */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* CHAT PANEL */
+  .chat-panel {
+    width: 380px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .msg {
+    display: flex;
+    gap: 10px;
+    animation: msgIn 0.2s ease;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg.user { flex-direction: row-reverse; }
+
+  .msg-avatar {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    flex-shrink: 0;
+    display: grid; place-items: center;
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .msg.agent .msg-avatar { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  .msg.user .msg-avatar { background: var(--surface2); font-size: 12px; }
+
+  .msg-bubble {
+    max-width: 260px;
+    padding: 10px 13px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .msg.agent .msg-bubble {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top-left-radius: 3px;
+  }
+  .msg.user .msg-bubble {
+    background: var(--accent);
+    color: #fff;
+    border-top-right-radius: 3px;
+  }
+
+  /* TYPING INDICATOR */
+  .typing {
+    display: flex; gap: 4px; align-items: center;
+    padding: 12px 13px;
+  }
+  .typing span {
+    width: 5px; height: 5px;
+    background: var(--muted);
+    border-radius: 50%;
+    animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-4px); }
+  }
+
+  /* AGENT STEPS */
+  .agent-steps {
+    display: flex; flex-direction: column; gap: 5px;
+    padding: 6px 0 2px;
+  }
+  .step {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 11.5px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    transition: color 0.3s;
+  }
+  .step.done { color: var(--green); }
+  .step.active { color: var(--accent); }
+  .step-icon { font-size: 10px; }
+
+  /* INPUT */
+  .input-area {
+    padding: 14px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .input-wrap {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    transition: border-color 0.2s;
+  }
+  .input-wrap:focus-within { border-color: var(--accent); }
+  textarea {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    line-height: 1.5;
+    resize: none;
+    padding: 11px 0;
+    max-height: 100px;
+  }
+  textarea::placeholder { color: var(--muted); }
+
+  .send-btn {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: grid; place-items: center;
+    color: white;
+    font-size: 14px;
+    transition: opacity 0.2s, transform 0.1s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { opacity: 0.85; }
+  .send-btn:active { transform: scale(0.95); }
+  .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* RESULTS PANEL */
+  .results-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .results-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .results-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .results-count {
+    font-size: 12px;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .results-grid {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    align-content: start;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* EMPTY STATE */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--muted);
+  }
+  .empty-icon { font-size: 48px; opacity: 0.3; }
+  .empty-text { font-size: 14px; }
+  .empty-sub { font-size: 12px; opacity: 0.6; }
+
+  /* PRODUCT CARD */
+  .product-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+    animation: cardIn 0.3s ease both;
+    display: flex;
+    flex-direction: column;
+  }
+  .product-card:nth-child(1) { animation-delay: 0.05s; }
+  .product-card:nth-child(2) { animation-delay: 0.1s; }
+  .product-card:nth-child(3) { animation-delay: 0.15s; }
+  .product-card:nth-child(4) { animation-delay: 0.2s; }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .product-card:hover { border-color: rgba(91,127,255,0.3); transform: translateY(-2px); }
+
+  .card-badge {
+    padding: 6px 12px;
+    background: linear-gradient(90deg, rgba(91,127,255,0.15), transparent);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .badge-store { font-size: 10.5px; color: var(--accent); font-weight: 600; letter-spacing: 0.3px; }
+  .badge-rank { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  .card-body { padding: 14px; flex: 1; }
+  .card-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-meta {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .card-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+  .card-original {
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: line-through;
+  }
+  .card-discount {
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 600;
+  }
+
+  .card-rating {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .stars { color: #fbbf24; letter-spacing: -1px; }
+
+  .card-reason {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.4;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 7px;
+    border-left: 2px solid var(--accent);
+    margin-bottom: 12px;
+  }
+
+  .card-footer { padding: 0 14px 14px; display: flex; gap: 8px; }
+  .btn-buy {
+    flex: 1;
+    padding: 9px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    font-family: 'Inter', sans-serif;
+  }
+  .btn-buy:hover { opacity: 0.85; }
+  .btn-buy:active { transform: scale(0.97); }
+
+  .btn-view {
+    padding: 9px 12px;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    font-family: 'Inter', sans-serif;
+  }
+  .btn-view:hover { background: var(--surface); color: var(--text); }
+
+  /* CONFIRM MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    place-items: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { display: grid; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px;
+    width: 380px;
+    animation: modalIn 0.2s ease;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+
+  .modal-product {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 20px;
+  }
+  .modal-product-name { font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+  .modal-product-detail { font-size: 12px; color: var(--muted); }
+  .modal-price { font-size: 22px; font-weight: 700; color: var(--accent); margin-top: 6px; }
+
+  .modal-warning {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 10px 12px;
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #fbbf24;
+    margin-bottom: 20px;
+    line-height: 1.4;
+  }
+
+  .modal-actions { display: flex; gap: 10px; }
+  .btn-confirm {
+    flex: 1; padding: 11px;
+    background: var(--green);
+    color: #000;
+    border: none; border-radius: 9px;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: opacity 0.2s;
+  }
+  .btn-confirm:hover { opacity: 0.85; }
+  .btn-cancel {
+    flex: 1; padding: 11px;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border); border-radius: 9px;
+    font-size: 14px; font-weight: 500;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: background 0.2s;
+  }
+  .btn-cancel:hover { background: var(--surface); color: var(--text); }
+
+  /* SUCCESS OVERLAY */
+  .success-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    place-items: center;
+    z-index: 200;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .success-overlay.open { display: grid; }
+  .success-box {
+    text-align: center;
+    animation: successIn 0.4s ease;
+  }
+  @keyframes successIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .success-icon {
+    font-size: 64px;
+    display: block;
+    margin-bottom: 16px;
+  }
+  .success-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; color: var(--green); }
+  .success-detail { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+  .success-order {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    background: var(--surface);
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: inline-block;
+    margin-bottom: 24px;
+  }
+  .btn-done {
+    padding: 12px 32px;
+    background: var(--accent);
+    color: white; border: none;
+    border-radius: 10px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* QUICK PROMPTS */
+  .quick-prompts {
+    padding: 10px 16px 0;
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .quick-btn {
+    padding: 5px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 11.5px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .quick-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(91,127,255,0.08); }
+
+  /* AUTH MODAL */
+  .auth-modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: none; place-items: center;
+    z-index: 200; backdrop-filter: blur(6px);
+  }
+  .auth-modal.open { display: grid; }
+  .auth-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px; padding: 32px;
+    width: 380px; animation: modalIn 0.25s ease;
+  }
+  .auth-logo { font-size: 28px; margin-bottom: 8px; }
+  .auth-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .auth-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .auth-tabs { display: flex; gap: 0; margin-bottom: 24px; background: var(--surface2); border-radius: 9px; padding: 3px; }
+  .auth-tab {
+    flex: 1; padding: 8px; border: none; background: none;
+    color: var(--muted); font-size: 13px; font-weight: 500;
+    border-radius: 7px; cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: all 0.2s;
+  }
+  .auth-tab.active { background: var(--surface); color: var(--text); }
+  .auth-error {
+    background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3);
+    border-radius: 8px; padding: 9px 12px; font-size: 12.5px;
+    color: var(--red); margin-bottom: 14px; display: none;
+  }
+  .auth-error.show { display: block; }
+
+  /* ORDERS PANEL */
+  .orders-panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 360px; background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 90; transform: translateX(100%);
+    transition: transform 0.3s ease;
+    display: flex; flex-direction: column;
+  }
+  .orders-panel.open { transform: translateX(0); }
+  .orders-panel-header {
+    padding: 18px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  .orders-panel-title { font-size: 15px; font-weight: 700; }
+  .close-btn {
+    width: 28px; height: 28px; border: 1px solid var(--border);
+    border-radius: 7px; background: none; color: var(--muted);
+    cursor: pointer; font-size: 14px; display: grid; place-items: center;
+  }
+  .orders-list { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .order-card {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 11px; padding: 13px;
+    animation: cardIn 0.2s ease;
+  }
+  .order-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+  .order-title { font-size: 13px; font-weight: 500; line-height: 1.3; flex: 1; margin-right: 8px; }
+  .order-price { font-size: 14px; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+  .order-meta { font-size: 11px; color: var(--muted); display: flex; gap: 10px; }
+  .order-status {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; font-weight: 600;
+    padding: 2px 8px; border-radius: 20px;
+  }
+  .order-status.placed { background: rgba(91,127,255,0.15); color: var(--accent); }
+  .order-status.shipped { background: rgba(251,191,36,0.15); color: #fbbf24; }
+  .order-status.delivered { background: rgba(52,211,153,0.15); color: var(--green); }
+
+  /* USER CHIP in header */
+  .user-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 10px 5px 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; cursor: pointer;
+    font-size: 12px; color: var(--muted);
+    transition: border-color 0.2s;
+    margin-left: auto;
+  }
+  .user-chip:hover { border-color: var(--accent); color: var(--text); }
+  .user-avatar {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: grid; place-items: center; font-size: 11px; color: white;
+  }
+  .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .orders-btn {
+    padding: 5px 10px;
+    background: none; border: 1px solid var(--border);
+    border-radius: 20px; font-size: 12px; color: var(--muted);
+    cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: all 0.2s;
+  }
+  .orders-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* CHECKOUT PROGRESS */
+  .checkout-progress {
+    position: fixed; bottom: 24px; right: 24px;
+    width: 320px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    z-index: 150;
+    display: none;
+    animation: slideUp 0.3s ease;
+  }
+  .checkout-progress.open { display: block; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .cp-title {
+    font-size: 13px; font-weight: 600; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .cp-spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .cp-steps { display: flex; flex-direction: column; gap: 6px; }
+  .cp-step {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 12px; color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.4;
+  }
+  .cp-step.done { color: var(--green); }
+  .cp-step.active { color: var(--text); }
+  .cp-step-icon { flex-shrink: 0; margin-top: 1px; }
+
+  /* PROFILE MODAL */
+  .profile-modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none; place-items: center;
+    z-index: 110;
+    backdrop-filter: blur(4px);
+  }
+  .profile-modal.open { display: grid; }
+  .profile-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px;
+    width: 420px;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: modalIn 0.2s ease;
+  }
+  .profile-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .profile-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .form-section { font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.5px; text-transform: uppercase; margin: 16px 0 10px; }
+  .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .form-field { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 11px; color: var(--muted); }
+  .form-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 11px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .card-note {
+    font-size: 11.5px; color: #fbbf24;
+    background: rgba(251,191,36,0.08);
+    border: 1px solid rgba(251,191,36,0.2);
+    border-radius: 7px; padding: 8px 10px;
+    margin-bottom: 16px; line-height: 1.4;
+  }
+  .profile-actions { display: flex; gap: 10px; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🛒</div>
+    <div class="logo-name">Top<span>Agent</span></div>
+  </div>
+  <div class="header-actions">
+    <div class="status-pill" style="margin-left:0;">
+      <div class="status-dot"></div>
+      AI agent online
+    </div>
+    <button class="orders-btn" id="ordersBtn" onclick="toggleOrders()" style="display:none;">📦 Orders</button>
+    <div class="user-chip" id="userChip" onclick="showAuthModal()" style="display:none;">
+      <div class="user-avatar" id="userAvatar">?</div>
+      <span id="userEmail">Sign in</span>
+    </div>
+    <button class="orders-btn" id="signInBtn" onclick="showAuthModal()">Sign in</button>
+  </div>
+</div>
+
+<div class="main">
+  <!-- CHAT -->
+  <div class="chat-panel">
+    <div class="messages" id="messages">
+      <div class="msg agent">
+        <div class="msg-avatar">🤖</div>
+        <div class="msg-bubble">
+          Hey! Tell me what you want to buy — I'll search the web, compare prices, and find the best option for you.
+        </div>
+      </div>
+    </div>
+
+    <div class="quick-prompts" id="quickPrompts">
+      <button class="quick-btn" onclick="useQuick('Wireless earbuds under $80')">🎧 Earbuds under $80</button>
+      <button class="quick-btn" onclick="useQuick('Mechanical keyboard for coding')">⌨️ Mech keyboard</button>
+      <button class="quick-btn" onclick="useQuick('Laptop stand under $40')">💻 Laptop stand</button>
+      <button class="quick-btn" onclick="useQuick('Running shoes for men')">👟 Running shoes</button>
+    </div>
+
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea id="userInput" placeholder="What do you want to buy?" rows="1"
+          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      </div>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-panel">
+    <div class="results-header">
+      <div class="results-title">Results</div>
+      <div class="results-count" id="resultsCount"></div>
+    </div>
+    <div id="emptyState" class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-text">No results yet</div>
+      <div class="empty-sub">Ask me to find something to buy</div>
+    </div>
+    <div class="results-grid" id="resultsGrid" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="auth-modal" id="authModal">
+  <div class="auth-box">
+    <div class="auth-logo">🛒</div>
+    <div class="auth-title">Welcome to TopAgent</div>
+    <div class="auth-sub">Sign in to save your profile and track orders</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+      <button class="auth-tab" id="tabSignup" onclick="switchTab('signup')">Create Account</button>
+    </div>
+    <div class="auth-error" id="authError"></div>
+    <div class="form-row">
+      <div class="form-field">
+        <div class="form-label">Email</div>
+        <input class="form-input" id="authEmail" type="email" placeholder="you@email.com">
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:10px;">
+      <div class="form-field">
+        <div class="form-label">Password</div>
+        <input class="form-input" id="authPassword" type="password" placeholder="••••••••">
+      </div>
+    </div>
+    <div class="profile-actions">
+      <button class="btn-cancel" onclick="closeAuthModal()" style="flex:1;padding:11px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:9px;font-size:14px;font-weight:500;cursor:pointer;font-family:Inter,sans-serif;">Cancel</button>
+      <button class="btn-confirm" id="authSubmitBtn" onclick="submitAuth()" style="flex:2;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Sign In</button>
+    </div>
+  </div>
+</div>
+
+<!-- ORDERS PANEL -->
+<div class="orders-panel" id="ordersPanel">
+  <div class="orders-panel-header">
+    <div class="orders-panel-title">📦 Order History</div>
+    <button class="close-btn" onclick="toggleOrders()">✕</button>
+  </div>
+  <div class="orders-list" id="ordersList">
+    <div style="text-align:center;color:var(--muted);font-size:13px;padding:40px 0;">
+      Loading orders...
+    </div>
+  </div>
+</div>
+
+<!-- USER PROFILE MODAL -->
+<div class="profile-modal" id="profileModal">
+  <div class="profile-box">
+    <div class="profile-title">Your Shipping & Payment</div>
+    <div class="profile-sub">Saved once — used for all future purchases</div>
+
+    <div class="form-section">Shipping Address</div>
+    <div class="form-row">
+      <div class="form-field"><div class="form-label">First Name</div><input class="form-input" id="pFirstName" placeholder="John"></div>
+      <div class="form-field"><div class="form-label">Last Name</div><input class="form-input" id="pLastName" placeholder="Smith"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><div class="form-label">Email</div><input class="form-input" id="pEmail" placeholder="john@email.com" type="email"></div>
+      <div class="form-field"><div class="form-label">Phone</div><input class="form-input" id="pPhone" placeholder="+1 555 0100"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><div class="form-label">Address</div><input class="form-input" id="pAddress" placeholder="123 Main St"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><div class="form-label">City</div><input class="form-input" id="pCity" placeholder="New York"></div>
+      <div class="form-field"><div class="form-label">State</div><input class="form-input" id="pState" placeholder="NY" style="max-width:80px"></div>
+      <div class="form-field"><div class="form-label">ZIP</div><input class="form-input" id="pZip" placeholder="10001" style="max-width:90px"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><div class="form-label">Country</div><input class="form-input" id="pCountry" placeholder="US" value="US"></div>
+    </div>
+
+    <div class="form-section">Payment</div>
+    <div class="card-note">⚠️ Demo only — use a test card number. No real charge will be made.</div>
+    <div class="form-row">
+      <div class="form-field"><div class="form-label">Card Number</div><input class="form-input" id="pCardNum" placeholder="4111 1111 1111 1111" maxlength="19"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><div class="form-label">Expiry</div><input class="form-input" id="pCardExp" placeholder="12/27" maxlength="5"></div>
+      <div class="form-field"><div class="form-label">CVV</div><input class="form-input" id="pCardCvv" placeholder="123" maxlength="4"></div>
+    </div>
+
+    <div class="profile-actions">
+      <button class="btn-cancel" onclick="closeProfileModal()" style="flex:1;padding:11px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:9px;font-size:14px;font-weight:500;cursor:pointer;font-family:Inter,sans-serif;">Cancel</button>
+      <button class="btn-confirm" onclick="saveProfileAndBuy()" style="flex:2;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Save & Buy Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- CHECKOUT PROGRESS -->
+<div class="checkout-progress" id="checkoutProgress">
+  <div class="cp-title">
+    <div class="cp-spinner" id="cpSpinner"></div>
+    Browser Agent Running
+  </div>
+  <div class="cp-steps" id="cpSteps"></div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <div class="modal-title">Confirm Purchase</div>
+    <div class="modal-sub">Review your order before we proceed</div>
+    <div class="modal-product" id="modalProduct"></div>
+    <div class="modal-warning">
+      ⚠️ In production, your saved payment method will be charged. This is a demo — no real purchase will be made.
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-confirm" onclick="confirmPurchase()">Confirm & Buy</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUCCESS -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-box">
+    <span class="success-icon">✅</span>
+    <div class="success-title">Order Placed!</div>
+    <div class="success-detail" id="successDetail"></div>
+    <div class="success-order" id="successOrder"></div>
+    <button class="btn-done" onclick="closeSuccess()">Back to Shopping</button>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const BACKEND = "http://localhost:3001"; // change to Railway URL in production
+
+let selectedProduct = null;
+let isLoading = false;
+let userProfile = JSON.parse(localStorage.getItem("topagent_profile") || "null");
+
+// ── Auth state ────────────────────────────────────────────────────────────────
+let authToken  = localStorage.getItem("topagent_token") || null;
+let authUser   = JSON.parse(localStorage.getItem("topagent_user") || "null");
+let authMode   = "login"; // login | signup
+
+function authHeaders() {
+  return authToken ? { "Authorization": `Bearer ${authToken}` } : {};
+}
+
+function initAuth() {
+  if (authUser) {
+    setLoggedIn(authUser);
+  }
+}
+
+function setLoggedIn(user) {
+  authUser = user;
+  document.getElementById("signInBtn").style.display = "none";
+  document.getElementById("userChip").style.display  = "flex";
+  document.getElementById("ordersBtn").style.display = "inline-flex";
+  document.getElementById("userEmail").textContent   = user.email.split("@")[0];
+  document.getElementById("userAvatar").textContent  = user.email[0].toUpperCase();
+}
+
+function setLoggedOut() {
+  authToken = authUser = null;
+  localStorage.removeItem("topagent_token");
+  localStorage.removeItem("topagent_user");
+  document.getElementById("signInBtn").style.display = "inline-flex";
+  document.getElementById("userChip").style.display  = "none";
+  document.getElementById("ordersBtn").style.display = "none";
+}
+
+function showAuthModal() {
+  if (authUser) {
+    // Already logged in — show logout option
+    if (confirm(`Sign out of ${authUser.email}?`)) {
+      setLoggedOut();
+    }
+    return;
+  }
+  document.getElementById("authModal").classList.add("open");
+  document.getElementById("authEmail").focus();
+}
+
+function closeAuthModal() {
+  document.getElementById("authModal").classList.remove("open");
+  document.getElementById("authError").classList.remove("show");
+}
+
+function switchTab(mode) {
+  authMode = mode;
+  document.getElementById("tabLogin").classList.toggle("active", mode === "login");
+  document.getElementById("tabSignup").classList.toggle("active", mode === "signup");
+  document.getElementById("authSubmitBtn").textContent = mode === "login" ? "Sign In" : "Create Account";
+  document.getElementById("authError").classList.remove("show");
+}
+
+async function submitAuth() {
+  const email    = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errEl    = document.getElementById("authError");
+  const btn      = document.getElementById("authSubmitBtn");
+
+  if (!email || !password) {
+    errEl.textContent = "Please fill in email and password.";
+    errEl.classList.add("show"); return;
+  }
+
+  btn.textContent = "Please wait...";
+  btn.disabled = true;
+
+  try {
+    const endpoint = authMode === "login" ? "/api/auth/login" : "/api/auth/signup";
+    const res  = await fetch(BACKEND + endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      errEl.textContent = data.error;
+      errEl.classList.add("show");
+      return;
+    }
+
+    authToken = data.session.access_token;
+    localStorage.setItem("topagent_token", authToken);
+    localStorage.setItem("topagent_user", JSON.stringify(data.user));
+    setLoggedIn(data.user);
+    closeAuthModal();
+    addMessage("agent", `👋 Welcome${authMode === "signup" ? "" : " back"}, <strong>${data.user.email.split("@")[0]}</strong>! Your orders and profile are now synced.`);
+
+  } catch (err) {
+    // Backend not running — demo mode
+    errEl.textContent = "Backend not running — demo mode active.";
+    errEl.classList.add("show");
+    const demoUser = { email, id: "demo-" + Date.now() };
+    authToken = "demo-token";
+    localStorage.setItem("topagent_token", authToken);
+    localStorage.setItem("topagent_user", JSON.stringify(demoUser));
+    setLoggedIn(demoUser);
+    closeAuthModal();
+  } finally {
+    btn.textContent = authMode === "login" ? "Sign In" : "Create Account";
+    btn.disabled = false;
+  }
+}
+
+// ── Orders panel ──────────────────────────────────────────────────────────────
+async function toggleOrders() {
+  const panel = document.getElementById("ordersPanel");
+  const open  = panel.classList.toggle("open");
+  if (open) await loadOrders();
+}
+
+async function loadOrders() {
+  const list = document.getElementById("ordersList");
+  list.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:13px;padding:40px 0;">Loading...</div>`;
+
+  try {
+    const res    = await fetch(BACKEND + "/api/orders", { headers: authHeaders() });
+    const data   = await res.json();
+    const orders = data.orders || [];
+
+    if (!orders.length) {
+      list.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:13px;padding:40px 0;">No orders yet.<br><span style="font-size:11px;opacity:0.5">Buy something to see it here</span></div>`;
+      return;
+    }
+
+    list.innerHTML = orders.map(o => `
+      <div class="order-card">
+        <div class="order-card-top">
+          <div class="order-title">${o.product_title}</div>
+          <div class="order-price">$${o.price}</div>
+        </div>
+        <div class="order-meta">
+          <span>${o.product_store}</span>
+          <span>·</span>
+          <span>${new Date(o.placed_at).toLocaleDateString()}</span>
+          <span>·</span>
+          <span class="order-status ${o.status}">${o.status}</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:5px;font-family:'JetBrains Mono',monospace;">${o.order_ref}</div>
+      </div>
+    `).join("");
+
+  } catch {
+    // Demo mode: show sample orders
+    list.innerHTML = `
+      <div class="order-card">
+        <div class="order-card-top">
+          <div class="order-title">Sony WH-1000XM5 Wireless Headphones</div>
+          <div class="order-price">$279</div>
+        </div>
+        <div class="order-meta">
+          <span>Amazon</span><span>·</span>
+          <span>${new Date().toLocaleDateString()}</span><span>·</span>
+          <span class="order-status placed">placed</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:5px;font-family:'JetBrains Mono',monospace;">ORD-DEMO1234</div>
+      </div>
+      <div style="text-align:center;color:var(--muted);font-size:11px;margin-top:8px;">Demo mode — connect backend to see real orders</div>
+    `;
+  }
+}
+
+// Init on load
+initAuth();
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function useQuick(text) {
+  document.getElementById('userInput').value = text;
+  sendMessage();
+}
+
+function addMessage(role, content) {
+  const messages = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `
+    <div class="msg-avatar">${role === 'agent' ? '🤖' : '👤'}</div>
+    <div class="msg-bubble">${content}</div>
+  `;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  return div;
+}
+
+function addTyping() {
+  const messages = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg agent';
+  div.id = 'typingIndicator';
+  div.innerHTML = `
+    <div class="msg-avatar">🤖</div>
+    <div class="msg-bubble">
+      <div class="typing"><span></span><span></span><span></span></div>
+    </div>
+  `;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typingIndicator');
+  if (t) t.remove();
+}
+
+function addSteps(steps) {
+  const messages = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg agent';
+  div.id = 'stepsMsg';
+  div.innerHTML = `
+    <div class="msg-avatar">🤖</div>
+    <div class="msg-bubble">
+      <div class="agent-steps">
+        ${steps.map((s, i) => `
+          <div class="step" id="step-${i}">
+            <span class="step-icon">◦</span>
+            ${s}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  return div;
+}
+
+async function animateSteps(stepTexts) {
+  addSteps(stepTexts);
+  for (let i = 0; i < stepTexts.length; i++) {
+    const el = document.getElementById(`step-${i}`);
+    if (el) {
+      el.classList.add('active');
+      el.querySelector('.step-icon').textContent = '→';
+    }
+    await delay(700 + Math.random() * 500);
+    if (el) {
+      el.classList.remove('active');
+      el.classList.add('done');
+      el.querySelector('.step-icon').textContent = '✓';
+    }
+  }
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function renderProducts(products, query) {
+  const grid = document.getElementById('resultsGrid');
+  const empty = document.getElementById('emptyState');
+  const count = document.getElementById('resultsCount');
+
+  grid.innerHTML = '';
+  grid.style.display = 'grid';
+  empty.style.display = 'none';
+  count.textContent = `${products.length} results`;
+
+  products.forEach((p, i) => {
+    const stars = '★'.repeat(Math.floor(p.rating)) + (p.rating % 1 >= 0.5 ? '½' : '');
+    const card = document.createElement('div');
+    card.className = 'product-card';
+    card.innerHTML = `
+      <div class="card-badge">
+        <span class="badge-store">${p.store}</span>
+        <span class="badge-rank">#${i + 1} match</span>
+      </div>
+      <div class="card-body">
+        <div class="card-title">${p.title}</div>
+        <div class="card-meta">
+          <span class="card-price">$${p.price}</span>
+          ${p.originalPrice ? `<span class="card-original">$${p.originalPrice}</span>` : ''}
+          ${p.originalPrice ? `<span class="card-discount">-${Math.round((1 - p.price/p.originalPrice)*100)}%</span>` : ''}
+        </div>
+        <div class="card-rating">
+          <span class="stars">${'★'.repeat(Math.floor(p.rating))}${'☆'.repeat(5 - Math.floor(p.rating))}</span>
+          ${p.rating} · ${p.reviews} reviews
+        </div>
+        <div class="card-reason">${p.why}</div>
+      </div>
+      <div class="card-footer">
+        <button class="btn-buy" onclick="buyProduct(${i})">Buy This →</button>
+        ${p.url ? `<button class="btn-view" onclick="window.open('${p.url}','_blank')">View</button>` : ''}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  window._products = products;
+}
+
+function buyProduct(index) {
+  selectedProduct = window._products[index];
+  const mp = document.getElementById('modalProduct');
+  mp.innerHTML = `
+    <div class="modal-product-name">${selectedProduct.title}</div>
+    <div class="modal-product-detail">${selectedProduct.store} · ⭐ ${selectedProduct.rating} (${selectedProduct.reviews} reviews)</div>
+    <div class="modal-price">$${selectedProduct.price}</div>
+  `;
+  document.getElementById('confirmModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('confirmModal').classList.remove('open');
+}
+
+function confirmPurchase() {
+  closeModal();
+  if (!userProfile) {
+    document.getElementById('profileModal').classList.add('open');
+  } else {
+    startCheckout();
+  }
+}
+
+function closeProfileModal() {
+  document.getElementById('profileModal').classList.remove('open');
+}
+
+function saveProfileAndBuy() {
+  const get = id => document.getElementById(id).value.trim();
+  userProfile = {
+    firstName: get('pFirstName'), lastName: get('pLastName'),
+    email: get('pEmail'),         phone: get('pPhone'),
+    address: get('pAddress'),     city: get('pCity'),
+    state: get('pState'),         zip: get('pZip'),
+    country: get('pCountry')      || 'US',
+    cardNumber: get('pCardNum'),  cardExpiry: get('pCardExp'),
+    cardCvv: get('pCardCvv')
+  };
+  localStorage.setItem("topagent_profile", JSON.stringify(userProfile));
+  closeProfileModal();
+  startCheckout();
+}
+
+async function startCheckout() {
+  if (!selectedProduct?.url) {
+    addMessage('agent', "⚠️ No product URL available for this item. In production, the agent finds the real URL during search.");
+    return;
+  }
+
+  const progress = document.getElementById('checkoutProgress');
+  const stepsEl  = document.getElementById('cpSteps');
+  progress.classList.add('open');
+  stepsEl.innerHTML = '';
+
+  addMessage('agent', `🤖 Browser agent starting checkout for <strong>${selectedProduct.title}</strong>...`);
+
+  const addCpStep = (text, state = 'active') => {
+    // Mark previous active as done
+    stepsEl.querySelectorAll('.cp-step.active').forEach(s => {
+      s.classList.remove('active');
+      s.classList.add('done');
+      s.querySelector('.cp-step-icon').textContent = '✓';
+    });
+    const div = document.createElement('div');
+    div.className = `cp-step ${state}`;
+    div.innerHTML = `<span class="cp-step-icon">${state === 'done' ? '✓' : '→'}</span> ${text}`;
+    stepsEl.appendChild(div);
+    stepsEl.scrollTop = stepsEl.scrollHeight;
+  };
+
+  try {
+    const evtSource = new EventSource(
+      `${BACKEND}/api/checkout-stream?` + new URLSearchParams({
+        product: JSON.stringify(selectedProduct),
+        profile: JSON.stringify(userProfile)
+      })
+    );
+
+    // SSE from /api/checkout uses POST — use fetch + ReadableStream instead
+    const res = await fetch(`${BACKEND}/api/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product: selectedProduct, userProfile })
+    });
+
+    evtSource.close();
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) continue;
+        if (line.startsWith('data: ')) {
+          try {
+            const payload = JSON.parse(line.slice(6));
+            if (payload.message) addCpStep(payload.message);
+            if (payload.orderId) {
+              finishCheckout(payload.orderId);
+            }
+          } catch {}
+        }
+      }
+    }
+
+  } catch (err) {
+    console.error('[checkout]', err);
+    // Backend not running — show demo flow
+    addCpStep('Launching secure browser...');
+    await delay(900);
+    addCpStep('Navigating to ' + selectedProduct.store + '...');
+    await delay(1200);
+    addCpStep('Adding to cart...');
+    await delay(900);
+    addCpStep('Filling shipping details...');
+    await delay(1000);
+    addCpStep('Entering payment info...');
+    await delay(800);
+    addCpStep('Confirming order...', 'done');
+    const orderId = 'ORD-' + Math.random().toString(36).substr(2,8).toUpperCase();
+    await delay(600);
+    finishCheckout(orderId);
+  }
+}
+
+function finishCheckout(orderId) {
+  document.getElementById('checkoutProgress').classList.remove('open');
+  document.getElementById('successDetail').textContent = `${selectedProduct.title} from ${selectedProduct.store}`;
+  document.getElementById('successOrder').textContent = `Order ID: ${orderId}`;
+  document.getElementById('successOverlay').classList.add('open');
+  addMessage('agent', `✅ Order confirmed! <strong>${selectedProduct.title}</strong> from ${selectedProduct.store}. Order: <code>${orderId}</code>. Delivery in 2–5 days.`);
+}
+
+function closeSuccess() {
+  document.getElementById('successOverlay').classList.remove('open');
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function sendMessage() {
+  const input = document.getElementById('userInput');
+  const query = input.value.trim();
+  if (!query || isLoading) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  isLoading = true;
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('quickPrompts').style.display = 'none';
+
+  addMessage('user', query);
+
+  await delay(300);
+
+  const steps = [
+    'Understanding your request...',
+    'Launching web search agent...',
+    'Scanning live product listings...',
+    'Comparing prices & reviews...',
+    'Ranking by best value...'
+  ];
+  await animateSteps(steps);
+
+  try {
+    const products = await callClaudeForProducts(query);
+    removeTyping();
+
+    const stepsMsg = document.getElementById('stepsMsg');
+    if (stepsMsg) {
+      // Update last agent message
+    }
+
+    renderProducts(products, query);
+    addMessage('agent', `Found <strong>${products.length} real results</strong> for "${query}" from live web search. Top pick: <strong>${products[0].title}</strong> at <strong>$${products[0].price}</strong> from ${products[0].store}. Click <em>Buy This</em> to proceed.`);
+  } catch (e) {
+    addMessage('agent', 'Sorry, I had trouble searching right now. Please try again.');
+    console.error(e);
+  }
+
+  isLoading = false;
+  document.getElementById('sendBtn').disabled = false;
+}
+
+async function callClaudeForProducts(query) {
+  const SYSTEM = `You are a shopping AI agent with web search access. 
+Search the web to find REAL, currently available products matching the user's request.
+After searching, respond with ONLY a valid JSON array (no markdown, no backticks, no explanation) of exactly 4 products.
+
+Each object must have:
+- title: string (exact real product name with brand and model)
+- price: number (real current USD price you found)
+- originalPrice: number or null (real original price if on sale, else null)
+- store: string (the actual store: Amazon, Walmart, Best Buy, Target, etc.)
+- rating: number (real rating from search results, 3.5–5.0)
+- reviews: string (real review count e.g. "2,341" or estimated if not found)
+- why: string (1 sentence: why this matches the user's request, mentioning a real spec or feature)
+- url: string or null (real product URL if found, else null)
+
+First search for the products, then analyze results, then return the JSON. 
+Order by best value first. Return ONLY the JSON array.`;
+
+  const messages = [{
+    role: "user",
+    content: `Search the web and find the best real products currently available for: "${query}". Return JSON array only.`
+  }];
+
+  const tools = [{ type: "web_search_20250305", name: "web_search" }];
+
+  let iterations = 0;
+
+  while (iterations < 8) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2000,
+        system: SYSTEM,
+        tools,
+        messages
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error.message);
+
+    // Check for final text answer
+    const textBlocks = (data.content || []).filter(b => b.type === "text");
+    if (data.stop_reason === "end_turn" && textBlocks.length > 0) {
+      const raw = textBlocks.map(b => b.text).join("");
+      const clean = raw.replace(/```json|```/g, '').trim();
+      // Find JSON array in text
+      const match = clean.match(/\[[\s\S]*\]/);
+      if (match) return JSON.parse(match[0]);
+      return JSON.parse(clean);
+    }
+
+    // Tool use — continue the loop
+    if (data.stop_reason === "tool_use" || (data.content || []).some(b => b.type === "tool_use")) {
+      // Add assistant turn
+      messages.push({ role: "assistant", content: data.content });
+
+      // Build tool results (web_search is server-side; results are in web_search_result blocks)
+      const toolUseBlocks = data.content.filter(b => b.type === "tool_use");
+      const webResultBlocks = data.content.filter(b => b.type === "web_search_result");
+
+      // Show live search query in chat
+      toolUseBlocks.forEach(b => {
+        if (b.name === "web_search" && b.input?.query) {
+          updateLiveStep(`🔎 Searching: "${b.input.query}"`);
+        }
+      });
+
+      // For server-side tools, send tool_result referencing each tool_use id
+      const toolResults = toolUseBlocks.map(b => ({
+        type: "tool_result",
+        tool_use_id: b.id,
+        content: webResultBlocks.length > 0
+          ? webResultBlocks.map(r => ({ type: "text", text: JSON.stringify(r) }))
+          : [{ type: "text", text: "Search executed." }]
+      }));
+
+      messages.push({ role: "user", content: toolResults });
+      iterations++;
+      continue;
+    }
+
+    // If we got text in a tool_use response, extract it
+    if (textBlocks.length > 0) {
+      const raw = textBlocks.map(b => b.text).join("");
+      const match = raw.match(/\[[\s\S]*\]/);
+      if (match) return JSON.parse(match[0]);
+    }
+
+    iterations++;
+  }
+
+  throw new Error("Agent loop exceeded max iterations");
+}
+
+function updateLiveStep(text) {
+  const stepsMsg = document.getElementById('stepsMsg');
+  if (!stepsMsg) return;
+  const steps = stepsMsg.querySelectorAll('.step');
+  // Find the active step and update it
+  for (let s of steps) {
+    if (s.classList.contains('active')) {
+      s.textContent = text;
+      break;
+    }
+  }
+  // Or just add it as a new line
+  const bubble = stepsMsg.querySelector('.msg-bubble');
+  if (bubble) {
+    const existing = bubble.querySelector('.live-search');
+    if (existing) {
+      existing.textContent = text;
+    } else {
+      const div = document.createElement('div');
+      div.className = 'live-search step active';
+      div.innerHTML = `<span class="step-icon">→</span> ${text}`;
+      div.style.marginTop = '4px';
+      bubble.querySelector('.agent-steps').appendChild(div);
+    }
+  }
+}
+</script>
+</body>
+</html>
