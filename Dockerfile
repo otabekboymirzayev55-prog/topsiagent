@@ -1,5 +1,5 @@
 # ── Stage 1: deps ────────────────────────────────────────────────────────────
-FROM node:20-slim AS deps
+FROM node:22-slim AS deps
 
 # Playwright needs these system libs for Chromium
 RUN apt-get update && apt-get install -y \
