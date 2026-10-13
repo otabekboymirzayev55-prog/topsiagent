@@ -2,9 +2,11 @@ import { createClient } from "@supabase/supabase-js";
 
 export const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY   // service key — server only, never expose to frontend
+  process.env.SUPABASE_SERVICE_KEY,
+  {
+    realtime: { enabled: false }
+  }
 );
-
 /**
  * Run this SQL once in Supabase → SQL Editor to set up the schema:
  *
