@@ -4,6 +4,7 @@ const CARD_SECRET = process.env.CARD_ENCRYPT_SECRET; // min 32 chars random stri
 
 // ── Middleware: verify JWT from frontend ─────────────────────────────────────
 export async function requireAuth(req, res, next) {
+  if (!supabase) return res.status(503).json({ error: "Authentication is not configured yet" });
   const token = req.headers.authorization?.replace("Bearer ", "");
   if (!token) return res.status(401).json({ error: "No token provided" });
 

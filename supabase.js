@@ -1,12 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 
-export const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY,
-  {
-    realtime: { enabled: false }
-  }
-);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+
+// Keep the shopping UI available when optional auth configuration is absent.
+// Auth-backed endpoints return a clear configuration error instead of crashing startup.
+export const supabase = supabaseUrl && supabaseKey
+  ? createClient(supabaseUrl, supabaseKey, { realtime: { enabled: false } })
+  : null;
+
+export function requireSupabase() {
+  if (!supabase) throw new Error("Supabase authentication is not configured");
+  return supabase;
+}
 /**
  * Run this SQL once in Supabase → SQL Editor to set up the schema:
  *
