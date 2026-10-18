@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { checkoutAgent } from "./checkout-agent.js";
 import { searchAgent } from "./search-agent.js";
 import {
@@ -9,8 +11,13 @@ import {
 import { supabase } from "./supabase.js";
 
 const app = express();
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+const frontendRoot = path.join(projectRoot, "frontend");
+
 app.use(cors());
 app.use(express.json());
+app.use(express.static(frontendRoot));
+app.get("/", (_, res) => res.sendFile(path.join(frontendRoot, "index.html")));
 
 // ── Health ───────────────────────────────────────────────────────────────────
 app.get("/health", (_, res) => res.json({ status: "ok", revision: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || null }));
