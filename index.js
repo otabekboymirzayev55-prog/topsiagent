@@ -64,11 +64,12 @@ app.get("/api/orders", requireAuth, async (req, res) => {
 
 // ── Search ───────────────────────────────────────────────────────────────────
 app.post("/api/search", async (req, res) => {
-  const { query } = req.body;
-  if (!query) return res.status(400).json({ error: "query required" });
+  const { query, history } = req.body || {};
+  if (typeof query !== "string" || !query.trim() || query.length > 1000)
+    return res.status(400).json({ error: "A query of up to 1000 characters is required" });
   try {
-    const products = await searchAgent(query);
-    res.json({ products });
+    const result = await searchAgent(query.trim(), Array.isArray(history) ? history : []);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
