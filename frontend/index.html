@@ -70,6 +70,7 @@
     .composer-wrap { padding:13px 15px 12px; border:1px solid var(--line); border-radius:27px; background:var(--soft); box-shadow:var(--shadow); }
     .composer-wrap:focus-within { border-color:#a1b7e4; }
     textarea { display:block; width:100%; min-height:41px; max-height:135px; padding:6px 4px; resize:none; color:var(--ink); background:transparent; border:0; outline:0; font-size:14px; line-height:1.5; }
+    textarea:focus-visible { outline:0; }
     textarea::placeholder { color:var(--muted); }
     .composer-bottom { display:flex; align-items:center; justify-content:space-between; min-height:34px; }
     .composer-mode { padding:6px 10px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:11px; font-weight:600; }
@@ -243,7 +244,7 @@
   }
   function priceText(product) {
     if (product.price === null || product.price === undefined) return t('priceUnknown');
-    try { return new Intl.NumberFormat(lang === 'uz' ? 'uz-UZ' : lang === 'ru' ? 'ru-RU' : 'en-US', {style:'currency',currency:product.currency || 'USD',maximumFractionDigits:2}).format(product.price); }
+    try { return new Intl.NumberFormat(lang === 'uz' ? 'uz-UZ' : lang === 'ru' ? 'ru-RU' : 'en-US', {style:'currency',currency:product.currency || 'USD',minimumFractionDigits:0,maximumFractionDigits:2}).format(product.price); }
     catch { return `${product.price} ${product.currency || 'USD'}`; }
   }
   function span(cls,text) { const el=document.createElement('span'); el.className=cls; el.textContent=text; return el; }
@@ -256,7 +257,7 @@
       const top=document.createElement('div'); top.className='card-top'; top.append(span('store',p.store),span('rank',String(i+1).padStart(2,'0')));
       const title=document.createElement('h3'); title.textContent=p.title;
       const price=document.createElement('div'); price.append(span(p.price==null?'price-unknown':'price',priceText(p)));
-      if(p.originalPrice>p.price && p.price!=null) price.append(span('old-price',new Intl.NumberFormat('en-US',{style:'currency',currency:p.currency||'USD'}).format(p.originalPrice)));
+      if(p.originalPrice>p.price && p.price!=null) price.append(span('old-price',new Intl.NumberFormat('en-US',{style:'currency',currency:p.currency||'USD',minimumFractionDigits:0,maximumFractionDigits:2}).format(p.originalPrice)));
       const reason=document.createElement('p'); reason.className='reason'; reason.textContent=p.why || '';
       const bottom=document.createElement('div'); bottom.className='card-bottom';
       const link=document.createElement('a'); link.className='store-link'; link.textContent=t('open'); link.href=p.url; link.target='_blank'; link.rel='noopener noreferrer';
