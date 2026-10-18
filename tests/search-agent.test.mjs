@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSearchResult, searchAgent, standaloneExclusion } from '../search-agent.js';
+import { normalizeSearchResult, searchAgent, standaloneExclusion, trustedRetailUrl, verifyProductLinks } from '../search-agent.js';
 
 test('standalone exclusions ask a follow-up without a product search', async () => {
   assert.match(standaloneExclusion('menga iPad kerak emas'), /qaysi mahsulot/);
@@ -8,6 +8,17 @@ test('standalone exclusions ask a follow-up without a product search', async () 
   assert.deepEqual(await searchAgent('menga iPad kerak emas'), {
     type: 'clarify', reply: 'Tushundim. Unda qaysi mahsulot kerak?', products: []
   });
+});
+
+test('drops broken product pages and rejects untrusted hosts', async () => {
+  assert.equal(trustedRetailUrl('https://olcha.uz/oz/product/view/phone'), true);
+  assert.equal(trustedRetailUrl('https://olcha.uz.evil.example/phone'), false);
+  const products = [
+    { url: 'https://olcha.uz/oz/product/view/phone' },
+    { url: 'https://market.beeline.uz/missing' }
+  ];
+  const fetchStub = async url => ({ status: url.includes('missing') ? 404 : 200, headers: new Headers() });
+  assert.deepEqual(await verifyProductLinks(products, fetchStub), [products[0]]);
 });
 
 test('normalization removes unsafe product links and unverified price currency', () => {
