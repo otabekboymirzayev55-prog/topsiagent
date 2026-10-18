@@ -1387,29 +1387,16 @@ async function sendMessage() {
 
   addMessage('user', query);
 
-  await delay(300);
-
-  const steps = [
-    'Understanding your request...',
-    'Launching web search agent...',
-    'Scanning live product listings...',
-    'Comparing prices & reviews...',
-    'Ranking by best value...'
-  ];
-  await animateSteps(steps);
+  addTyping();
 
   try {
-    const products = await callClaudeForProducts(query);
+    const products = await searchProducts(query);
     removeTyping();
-
-    const stepsMsg = document.getElementById('stepsMsg');
-    if (stepsMsg) {
-      // Update last agent message
-    }
 
     renderProducts(products, query);
     addMessage('agent', `Found <strong>${products.length} real results</strong> for "${query}" from live web search. Top pick: <strong>${products[0].title}</strong> at <strong>$${products[0].price}</strong> from ${products[0].store}. Click <em>Buy This</em> to proceed.`);
   } catch (e) {
+    removeTyping();
     addMessage('agent', 'Sorry, I had trouble searching right now. Please try again.');
     console.error(e);
   }
@@ -1418,129 +1405,18 @@ async function sendMessage() {
   document.getElementById('sendBtn').disabled = false;
 }
 
-async function callClaudeForProducts(query) {
-  const SYSTEM = `You are a shopping AI agent with web search access. 
-Search the web to find REAL, currently available products matching the user's request.
-After searching, respond with ONLY a valid JSON array (no markdown, no backticks, no explanation) of exactly 4 products.
-
-Each object must have:
-- title: string (exact real product name with brand and model)
-- price: number (real current USD price you found)
-- originalPrice: number or null (real original price if on sale, else null)
-- store: string (the actual store: Amazon, Walmart, Best Buy, Target, etc.)
-- rating: number (real rating from search results, 3.5–5.0)
-- reviews: string (real review count e.g. "2,341" or estimated if not found)
-- why: string (1 sentence: why this matches the user's request, mentioning a real spec or feature)
-- url: string or null (real product URL if found, else null)
-
-First search for the products, then analyze results, then return the JSON. 
-Order by best value first. Return ONLY the JSON array.`;
-
-  const messages = [{
-    role: "user",
-    content: `Search the web and find the best real products currently available for: "${query}". Return JSON array only.`
-  }];
-
-  const tools = [{ type: "web_search_20250305", name: "web_search" }];
-
-  let iterations = 0;
-
-  while (iterations < 8) {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2000,
-        system: SYSTEM,
-        tools,
-        messages
-      })
-    });
-
-    const data = await res.json();
-
-    if (data.error) throw new Error(data.error.message);
-
-    // Check for final text answer
-    const textBlocks = (data.content || []).filter(b => b.type === "text");
-    if (data.stop_reason === "end_turn" && textBlocks.length > 0) {
-      const raw = textBlocks.map(b => b.text).join("");
-      const clean = raw.replace(/```json|```/g, '').trim();
-      // Find JSON array in text
-      const match = clean.match(/\[[\s\S]*\]/);
-      if (match) return JSON.parse(match[0]);
-      return JSON.parse(clean);
-    }
-
-    // Tool use — continue the loop
-    if (data.stop_reason === "tool_use" || (data.content || []).some(b => b.type === "tool_use")) {
-      // Add assistant turn
-      messages.push({ role: "assistant", content: data.content });
-
-      // Build tool results (web_search is server-side; results are in web_search_result blocks)
-      const toolUseBlocks = data.content.filter(b => b.type === "tool_use");
-      const webResultBlocks = data.content.filter(b => b.type === "web_search_result");
-
-      // Show live search query in chat
-      toolUseBlocks.forEach(b => {
-        if (b.name === "web_search" && b.input?.query) {
-          updateLiveStep(`🔎 Searching: "${b.input.query}"`);
-        }
-      });
-
-      // For server-side tools, send tool_result referencing each tool_use id
-      const toolResults = toolUseBlocks.map(b => ({
-        type: "tool_result",
-        tool_use_id: b.id,
-        content: webResultBlocks.length > 0
-          ? webResultBlocks.map(r => ({ type: "text", text: JSON.stringify(r) }))
-          : [{ type: "text", text: "Search executed." }]
-      }));
-
-      messages.push({ role: "user", content: toolResults });
-      iterations++;
-      continue;
-    }
-
-    // If we got text in a tool_use response, extract it
-    if (textBlocks.length > 0) {
-      const raw = textBlocks.map(b => b.text).join("");
-      const match = raw.match(/\[[\s\S]*\]/);
-      if (match) return JSON.parse(match[0]);
-    }
-
-    iterations++;
+async function searchProducts(query) {
+  const response = await fetch(`${BACKEND}/api/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `Search failed (HTTP ${response.status})`);
+  if (!Array.isArray(data.products) || data.products.length === 0) {
+    throw new Error('Search returned no products');
   }
-
-  throw new Error("Agent loop exceeded max iterations");
-}
-
-function updateLiveStep(text) {
-  const stepsMsg = document.getElementById('stepsMsg');
-  if (!stepsMsg) return;
-  const steps = stepsMsg.querySelectorAll('.step');
-  // Find the active step and update it
-  for (let s of steps) {
-    if (s.classList.contains('active')) {
-      s.textContent = text;
-      break;
-    }
-  }
-  // Or just add it as a new line
-  const bubble = stepsMsg.querySelector('.msg-bubble');
-  if (bubble) {
-    const existing = bubble.querySelector('.live-search');
-    if (existing) {
-      existing.textContent = text;
-    } else {
-      const div = document.createElement('div');
-      div.className = 'live-search step active';
-      div.innerHTML = `<span class="step-icon">→</span> ${text}`;
-      div.style.marginTop = '4px';
-      bubble.querySelector('.agent-steps').appendChild(div);
-    }
-  }
+  return data.products;
 }
 </script>
 </body>
