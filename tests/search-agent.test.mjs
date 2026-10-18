@@ -18,4 +18,5 @@ test('normalization removes unsafe product links and unverified price currency',
   assert.equal(result.products.length, 1);
   assert.equal(result.products[0].price, null);
   assert.equal(result.products[0].currency, null);
+  assert.equal(normalizeSearchResult('Here are options: {"type":"clarify","reply":"Tell me more","products":[]}').reply, 'Tell me more');
 });

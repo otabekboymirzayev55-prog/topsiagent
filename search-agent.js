@@ -32,7 +32,17 @@ export function standaloneExclusion(query) {
 }
 
 export function normalizeSearchResult(raw) {
-  const data = typeof raw === "string" ? JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "").trim()) : raw;
+  let data = raw;
+  if (typeof raw === "string") {
+    const clean = raw.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
+    try { data = JSON.parse(clean); }
+    catch {
+      const start = clean.indexOf("{");
+      const end = clean.lastIndexOf("}");
+      if (start < 0 || end <= start) throw new Error("No JSON object in search response");
+      data = JSON.parse(clean.slice(start, end + 1));
+    }
+  }
   if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid search response");
   const products = (Array.isArray(data.products) ? data.products : []).filter(p =>
     p && typeof p.title === "string" && p.title.trim() &&
@@ -65,12 +75,20 @@ export async function searchAgent(query, history = []) {
     { role: "user", content: query }
   ];
 
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const response = await client.messages.create({ model, max_tokens: 3000, system, tools, messages });
+  let formatRetries = 0;
+  let canSearch = true;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const response = await client.messages.create({ model, max_tokens: 3000, system, ...(canSearch ? { tools } : {}), messages });
     const answer = response.content.filter(block => block.type === "text").map(block => block.text).join("\n").trim();
     if (response.stop_reason === "end_turn" && answer) {
       try { return normalizeSearchResult(answer); }
-      catch (error) { throw new Error(`Search response could not be read: ${error.message}`); }
+      catch (error) {
+        if (formatRetries++ >= 2) throw new Error(`Search response could not be read: ${error.message}`);
+        messages.push({ role: "assistant", content: response.content });
+        messages.push({ role: "user", content: "Convert your previous answer into exactly one valid JSON object matching the required schema. Do not add prose, markdown, citations, or new products. Use [] if no products were verified." });
+        canSearch = false;
+        continue;
+      }
     }
     if (response.stop_reason !== "pause_turn") throw new Error("Search agent did not finish its answer");
     messages.push({ role: "assistant", content: response.content });
