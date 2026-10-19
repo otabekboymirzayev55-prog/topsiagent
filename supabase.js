@@ -7,6 +7,13 @@ export const supabase = createClient(
     realtime: { enabled: false }
   }
 );
+
+// Auth calls get their own client so one user's session cannot affect another request.
+export function createAuthClient() {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
 /**
  * Run this SQL once in Supabase → SQL Editor to set up the schema:
  *

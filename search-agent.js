@@ -11,14 +11,15 @@ const retailerDomains = [
   "asaxiy.uz", "texnomart.uz", "alifshop.uz", "idea.uz", "goodzone.uz"
 ];
 
-const system = `You are TopAgent, a careful multilingual shopping assistant.
+const system = `You are Top, a careful multilingual shopping assistant.
 Reply in the language of the user's latest message (Uzbek, Russian, English, etc.). Use prior turns only to understand follow-up requests. Respect all positive and negative constraints, especially product category, budget, country, brand and explicit exclusions. A statement like "menga iPad kerak emas" means the user does NOT want an iPad; ask what they want instead. If shopping intent or a critical requirement is unclear, ask one concise clarifying question and DO NOT search or recommend products.
+When a user includes a photo, identify only visible product details. Do not claim an exact brand or model unless it is clearly visible. Search for that product or close matches and explain uncertainty when needed. A follow-up can refer to an earlier photo.
 
 When the request is clear, use web search for current, direct product pages from established retailers. Return 1 to 4 genuinely relevant products, never pad the list. Do not recommend accessories when the user asks for the main device. Do not invent prices, discounts, ratings, review counts, availability, URLs, or delivery dates. Omit uncertain fields. Treat a source's price as indicative; it can change at checkout. If no relevant product can be verified, return an empty list and explain this. Keep the reply general rather than naming a top store or price, since product links are validated after your answer.
 
 Your final answer MUST be a single JSON object, without markdown:
-{"type":"clarify"|"results","reply":"short helpful message in user's language","products":[{"title":"exact product name","price":number|null,"currency":"USD or source currency","originalPrice":number|null,"store":"retailer","rating":number|null,"reviews":string|null,"why":"specific reason this matches","url":"direct https product URL"}]}
-For clarify, products must be []. For results, include only products actually supported by search results. Reply should not claim certainty about stock or price.`;
+{"type":"clarify"|"results","reply":"short helpful message in user's language","products":[{"title":"exact product name","price":number|null,"currency":"USD or source currency","originalPrice":number|null,"store":"retailer","rating":number|null,"reviews":string|null,"why":"specific reason this matches","url":"direct https product URL"}],"followUps":["short relevant follow-up the user can tap"]}
+For clarify, products must be [] and followUps should contain up to 3 short, plausible answers to your question when possible. For results, include only products actually supported by search results; followUps should offer useful next steps such as a lower budget, another brand or more options. Do not put a purchase link in followUps: the interface provides the retailer link. Reply should not claim certainty about stock or price.`;
 
 function validUrl(value) {
   try {
@@ -66,7 +67,7 @@ export function standaloneExclusion(query) {
 }
 
 function verifiedReply(query, found) {
-  if (/\b(?:menga|kerak|dollargacha|o.zbekistonda|narx)\b/i.test(query))
+  if (/\b(?:menga|kerak|dollargacha|o.zbekistonda|narx|mahsulotni|rasmdagi)\b/i.test(query))
     return found ? "Ishlaydigan do‘kon havolalari bilan mos variantlarni topdim. Narxni do‘konda tekshiring." : "Hozir ishlaydigan mahsulot havolasini tasdiqlay olmadim. Talabni aniqlashtiring yoki qayta urinib ko‘ring.";
   if (/[А-Яа-яЁё]/.test(query))
     return found ? "Нашёл подходящие варианты с рабочими ссылками. Проверьте цену в магазине." : "Не удалось подтвердить рабочую ссылку на товар. Уточните запрос или попробуйте позже.";
@@ -104,17 +105,30 @@ export function normalizeSearchResult(raw) {
     type: data.type === "clarify" || products.length === 0 ? "clarify" : "results",
     reply: typeof data.reply === "string" && data.reply.trim() ? data.reply.trim() :
       (products.length ? "Mos keladigan variantlarni topdim. Narxni do‘konda tekshiring." : "Qaysi mahsulotni qidiryapsiz?"),
-    products
+    products,
+    followUps: (Array.isArray(data.followUps) ? data.followUps : [])
+      .filter(item => typeof item === "string" && item.trim() && item.length <= 100).slice(0, 3)
   };
 }
 
-export async function searchAgent(query, history = []) {
-  const exclusionReply = standaloneExclusion(query);
+function turnContent(text, imageId, images) {
+  const image = imageId && images.get(imageId);
+  if (!image) return text;
+  return [
+    { type: "image", source: { type: "base64", media_type: image.mimeType, data: image.data } },
+    { type: "text", text }
+  ];
+}
+
+export async function searchAgent(query, history = [], images = new Map(), imageId = null) {
+  const exclusionReply = !imageId && standaloneExclusion(query);
   if (exclusionReply) return { type: "clarify", reply: exclusionReply, products: [] };
   const messages = [
     ...history.slice(-8).filter(turn => turn && ["user", "assistant"].includes(turn.role) && typeof turn.content === "string")
-      .map(turn => ({ role: turn.role, content: turn.content.slice(0, 1200) })),
-    { role: "user", content: query }
+      .map(turn => ({ role: turn.role, content: turn.role === "user"
+        ? turnContent(turn.content.slice(0, 1200), turn.imageId, images)
+        : turn.content.slice(0, 1200) })),
+    { role: "user", content: turnContent(query, imageId, images) }
   ];
 
   let formatRetries = 0;
