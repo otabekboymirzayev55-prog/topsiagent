@@ -246,6 +246,7 @@
     @keyframes rise-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; animation:none!important; } }
   </style>
+  <link rel="stylesheet" href="./design.css">
 </head>
 <body>
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><defs><linearGradient id="top-gradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop stop-color="#2787ff"/><stop offset="100%" stop-color="#9454e8"/></linearGradient></defs></svg>
@@ -253,6 +254,7 @@
   <aside class="rail" id="rail" aria-label="Suhbatlar">
     <div class="rail-header"><span class="rail-brand"><svg class="logo-mark" viewBox="0 0 36 36" aria-hidden="true"><path class="star-main" d="M17.2 2.6c.7 8.4 4.3 12 12.7 12.7-8.4.7-12 4.3-12.7 12.7-.7-8.4-4.3-12-12.7-12.7 8.4-.7 12-4.3 12.7-12.7Z"/><path class="star-small" d="M28.5 22.5c.25 2.6 1.4 3.75 4 4-2.6.25-3.75 1.4-4 4-.25-2.6-1.4-3.75-4-4 2.6-.25 3.75-1.4 4-4Z"/></svg>Top</span><button class="rail-action" id="railClose" type="button" aria-label="Menyuni yopish" title="Menyuni yopish">×</button></div>
     <button class="rail-new" id="railNew" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M16 3h5v5"/><path d="m10 14 11-11"/></svg><span id="railNewText">Yangi chat</span></button>
+    <label class="rail-search" for="historySearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg><input id="historySearch" type="search" placeholder="Chatlarni qidirish" autocomplete="off" aria-label="Chatlarni qidirish"></label>
     <div class="history-label" id="historyLabel">Chat tarixi</div>
     <nav class="history-list" id="historyList" aria-label="Chat tarixi"></nav>
     <div class="rail-settings"><button class="theme-btn" id="themeMobile" type="button" aria-label="Qora rejim" title="Qora rejim"><span class="theme-swatch" aria-hidden="true"></span></button></div>
@@ -274,6 +276,7 @@
     <div class="content-scroll" id="contentScroll">
     <section class="conversation" aria-labelledby="chatHeading">
       <div class="conversation-head">
+        <svg class="welcome-mark logo-mark" viewBox="0 0 36 36" aria-hidden="true"><path class="star-main" d="M17.2 2.6c.7 8.4 4.3 12 12.7 12.7-8.4.7-12 4.3-12.7 12.7-.7-8.4-4.3-12-12.7-12.7 8.4-.7 12-4.3 12.7-12.7Z"/><path class="star-small" d="M28.5 22.5c.25 2.6 1.4 3.75 4 4-2.6.25-3.75 1.4-4 4-.25-2.6-1.4-3.75-4-4 2.6-.25 3.75-1.4 4-4Z"/></svg>
         <h1 id="chatHeading">Bugun nima sotib olamiz?</h1>
       </div>
       <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Suhbat"></div>

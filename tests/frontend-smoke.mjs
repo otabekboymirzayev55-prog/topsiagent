@@ -54,6 +54,13 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     assert.equal(await page.locator('.message.user').count(), 2);
     assert.equal(await page.locator('.card').count(), 2);
     assert.equal(await page.locator('#historyList .history-item').count(), 1);
+    await page.locator('#historySearch').fill('quloqchin');
+    assert.equal(await page.locator('#historyList .history-item').count(), 1);
+    await page.locator('#historySearch').fill('telefon');
+    assert.equal(await page.locator('#historyList .history-item').count(), 0);
+    assert.equal(await page.locator('.history-empty').innerText(), 'Mos chat topilmadi');
+    await page.locator('#historySearch').fill('');
+    assert.equal(await page.locator('#historyList .history-item').count(), 1);
     await page.locator('#newSearch').click();
     assert.equal(await page.locator('#chatHeading').isVisible(), true);
     await page.locator('#historyList .history-open').click();

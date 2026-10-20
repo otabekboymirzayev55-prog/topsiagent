@@ -77,6 +77,8 @@ function setLanguage() {
   $('newSearch').textContent = t('new');
   $('railNewText').textContent = t('new');
   $('historyLabel').textContent = t('history');
+  $('historySearch').placeholder = 'Chatlarni qidirish';
+  $('historySearch').setAttribute('aria-label', 'Chatlarni qidirish');
   $('mobileMenu').setAttribute('aria-label', t('history'));
   $('mobileNew').setAttribute('aria-label', t('new'));
   $('mobileNew').title = t('new');
@@ -113,7 +115,13 @@ function updateAccountUI() {
 function renderHistory() {
   document.querySelectorAll('body > .history-menu').forEach(node=>node.remove());
   $('historyList').replaceChildren();
-  chats.filter(chat => chat.messages.length).sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt)).forEach(chat => {
+  const query=$('historySearch').value.trim().toLocaleLowerCase('uz');
+  const visible=chats.filter(chat => chat.messages.length && (!query || chat.title.toLocaleLowerCase('uz').includes(query)))
+    .sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  if(query && !visible.length) {
+    const empty=document.createElement('p'); empty.className='history-empty'; empty.textContent='Mos chat topilmadi'; $('historyList').append(empty);
+  }
+  visible.forEach(chat => {
     const item=document.createElement('div'); item.className='history-item' + (chat.id===activeId ? ' active' : '');
     const open=document.createElement('button'); open.type='button'; open.className='history-open'; open.textContent=chat.title; open.title=chat.title;
     open.addEventListener('click',()=>selectChat(chat.id));
@@ -146,6 +154,7 @@ function selectChat(id) {
 function newChat() {
   if (loading) { requestController?.abort(); loading=false; }
   clearPendingImage();
+  $('historySearch').value='';
   activeId=null; products=[]; selected.clear(); persist(); $('input').value=''; $('input').style.height='auto'; updateSendState(); renderConversation(); closeRail(); $('input').focus();
 }
 async function deleteChat(chat) {
@@ -534,6 +543,7 @@ async function renderSharedChat() {
 $('send').addEventListener('click',()=>send());
 $('input').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send();}});
 $('input').addEventListener('input',()=>{ $('input').style.height='auto'; $('input').style.height=Math.min($('input').scrollHeight,130)+'px'; updateSendState(); renderSuggestions(); });
+$('historySearch').addEventListener('input',renderHistory);
 $('newSearch').addEventListener('click',newChat); $('railNew').addEventListener('click',newChat); $('mobileNew').addEventListener('click',newChat);
 $('mobileMenu').addEventListener('click',openRail); $('railClose').addEventListener('click',closeRail); $('backdrop').addEventListener('click',closeRail);
 $('themeToggle').addEventListener('click',()=>{darkTheme=!darkTheme;localStorage.setItem('topagent_theme',darkTheme?'dark':'light');updateTheme();});
