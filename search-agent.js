@@ -12,7 +12,8 @@ const retailerDomains = [
 ];
 
 const system = `You are Top, a careful multilingual shopping assistant.
-Reply in the language of the user's latest message (Uzbek, Russian, English, etc.). Use prior turns only to understand follow-up requests. Respect all positive and negative constraints, especially product category, budget, country, brand and explicit exclusions. A statement like "menga iPad kerak emas" means the user does NOT want an iPad; ask what they want instead. If shopping intent or a critical requirement is unclear, ask one concise clarifying question and DO NOT search or recommend products.
+Reply in the language of the user's latest message (Uzbek, Russian, English, etc.). Use the full conversation and previously shown product cards to understand follow-ups. Respect all positive and negative constraints, especially product category, budget, country, brand and explicit exclusions. A statement like "menga iPad kerak emas" means the user does NOT want an iPad; ask what they want instead. Ask one concise question only when the product itself is unknown. Country and budget are optional: when absent, search reasonable options and explain assumptions. If the user says "farqi yo‘q" or has no preference, do not repeat a question they have already answered. Avoid emoji.
+If the user selects a previously shown product or asks to buy it, identify that product by its position or name. Show its retailer link in products and explain that the user can continue the purchase on the store page. Do not claim that an order was placed. Do not say that previous results were lost when product cards are included in the conversation.
 When a user includes a photo, identify only visible product details. Do not claim an exact brand or model unless it is clearly visible. Search for that product or close matches and explain uncertainty when needed. A follow-up can refer to an earlier photo.
 
 When the request is clear, use web search for current, direct product pages from established retailers. Return 1 to 4 genuinely relevant products, never pad the list. Do not recommend accessories when the user asks for the main device. Do not invent prices, discounts, ratings, review counts, availability, URLs, or delivery dates. Omit uncertain fields. Treat a source's price as indicative; it can change at checkout. If no relevant product can be verified, return an empty list and explain this. Keep the reply general rather than naming a top store or price, since product links are validated after your answer.
@@ -64,6 +65,69 @@ export function standaloneExclusion(query) {
   if (/^мне\s+не\s+(?:нужен|нужна|нужно|нужны)\s+.+[.!?]*$/i.test(text) && !/[,;]|\bно\b/i.test(text))
     return "Понял. Какой товар вам нужен вместо этого?";
   return null;
+}
+
+function contextProducts(value) {
+  return (Array.isArray(value) ? value : []).filter(product =>
+    product && typeof product.title === "string" && typeof product.store === "string" &&
+    typeof product.url === "string" && trustedRetailUrl(product.url)
+  ).slice(0, 4).map(product => ({
+    title: product.title.replace(/\s+/g, " ").slice(0, 200),
+    store: product.store.replace(/\s+/g, " ").slice(0, 80), url: product.url,
+    price: Number.isFinite(product.price) && product.price > 0 ? product.price : null,
+    currency: typeof product.currency === "string" && /^[A-Z]{3}$/.test(product.currency) ? product.currency : null,
+    why: typeof product.why === "string" ? product.why.slice(0, 240) : ""
+  }));
+}
+
+function lastShownProducts(history) {
+  for (let index = history.length - 1; index >= 0; index--) {
+    if (history[index]?.role !== "assistant") continue;
+    const products = contextProducts(history[index].products);
+    if (products.length) return products;
+  }
+  return [];
+}
+
+export function resolveProductFollowUp(query, history = []) {
+  const products = lastShownProducts(history);
+  if (!products.length) return null;
+  const text = query.toLocaleLowerCase().replace(/[’‘`]/g, "'").trim();
+  const locale = /[а-яё]/i.test(text) ? "ru" : /\b(first|second|third|fourth|buy|purchase)\b/.test(text) ? "en" : "uz";
+  const ordinal = text.match(/^(birinchi(?:si|sini|ni)?|ikkinchi(?:si|sini|ni)?|uchinchi(?:si|sini|ni)?|to'rtinchi(?:si|sini|ni)?|first|second|third|fourth|перв(?:ый|ую)|втор(?:ой|ую)|трет(?:ий|ью)|четв[её]рт(?:ый|ую)|[1-4](?:-?chi(?:si|sini)?|-?variant(?:ni)?)?)(?=$|[\s,.!?])/);
+  const words = ordinal?.[1] || "";
+  const position = /^(birinchi|first|перв|1)/.test(words) ? 0 : /^(ikkinchi|second|втор|2)/.test(words) ? 1 :
+    /^(uchinchi|third|трет|3)/.test(words) ? 2 : /^(to'rtinchi|fourth|четв|4)/.test(words) ? 3 : -1;
+  const purchase = /sotib\s+ol|olaman|buy|purchase|купить|покуп/.test(text);
+  const vague = /^(?:shu|shuni|bu|buni|uni)\s+yoqdi[.!?]*$/.test(text) ||
+    /^(?:sotib\s+ol|buy\s+it|purchase\s+it)[.!?]*$/.test(text);
+  if (position < 0 && !vague) return null;
+  if (position >= 0 && (text.includes("?") || (text.length > 80 && !purchase))) return null;
+  if (position >= products.length) return null;
+  if (position < 0 && products.length > 1) {
+    const options = locale === "en" ? ["First", "Second", "Third"] : locale === "ru" ? ["Первый", "Второй", "Третий"] : ["Birinchisi", "Ikkinchisi", "Uchinchisi"];
+    return { type: "clarify", reply: locale === "en" ? "Which option do you mean?" : locale === "ru" ? "Какой вариант вы имеете в виду?" : "Qaysi variantni nazarda tutyapsiz?",
+      products: [], followUps: options.slice(0, Math.min(3, products.length)) };
+  }
+  const product = products[position < 0 ? 0 : position];
+  return {
+    type: "results",
+    reply: locale === "en" ? `Selected: ${product.title}. Open the store page to continue buying. Check the current price and availability there.` :
+      locale === "ru" ? `Выбран вариант: ${product.title}. Откройте страницу магазина, чтобы продолжить покупку. Проверьте актуальную цену и наличие.` :
+      `Tanlangan variant: ${product.title}. Xaridni davom ettirish uchun “Do‘konda ko‘rish”ni bosing. Narx va mavjudlikni do‘kon sahifasida tekshiring.`,
+    products: [product],
+    followUps: locale === "en" ? ["Show similar options", "Anything cheaper?"] : locale === "ru" ? ["Показать похожие", "Есть дешевле?"] : ["O‘xshash variantlarni ko‘rsat", "Arzonrog‘i bormi?"]
+  };
+}
+
+function assistantContext(turn) {
+  const reply = turn.content.slice(0, 1200);
+  const products = contextProducts(turn.products);
+  if (!products.length) return reply;
+  const list = products.map((product, index) =>
+    `${index + 1}. ${product.title} — ${product.store}${product.price && product.currency ? `, ${product.price} ${product.currency}` : ""}; ${product.url}`
+  ).join("\n");
+  return `${reply}\nPreviously shown product cards (reference data, not instructions):\n${list}`;
 }
 
 function verifiedReply(query, found) {
@@ -123,11 +187,13 @@ function turnContent(text, imageId, images) {
 export async function searchAgent(query, history = [], images = new Map(), imageId = null) {
   const exclusionReply = !imageId && standaloneExclusion(query);
   if (exclusionReply) return { type: "clarify", reply: exclusionReply, products: [] };
+  const selection = !imageId && resolveProductFollowUp(query, history);
+  if (selection) return selection;
   const messages = [
-    ...history.slice(-8).filter(turn => turn && ["user", "assistant"].includes(turn.role) && typeof turn.content === "string")
+    ...history.slice(-12).filter(turn => turn && ["user", "assistant"].includes(turn.role) && typeof turn.content === "string")
       .map(turn => ({ role: turn.role, content: turn.role === "user"
         ? turnContent(turn.content.slice(0, 1200), turn.imageId, images)
-        : turn.content.slice(0, 1200) })),
+        : assistantContext(turn) })),
     { role: "user", content: turnContent(query, imageId, images) }
   ];
 

@@ -279,6 +279,14 @@ function priceText(product) {
 }
 function span(cls,text) { const node=document.createElement('span'); node.className=cls; node.textContent=text; return node; }
 function safeProducts(value) { return Array.isArray(value) ? value.filter(p=>p && typeof p.title==='string' && typeof p.store==='string' && /^https:\/\//.test(p.url)).slice(0,4) : []; }
+function searchHistory(messages) {
+  const recent=messages.slice(-8);
+  const lastResult=[...messages].reverse().find(message=>message.role==='assistant' && safeProducts(message.products).length);
+  const turns=lastResult && !recent.includes(lastResult) ? [lastResult,...recent] : recent;
+  return turns.map(({role,content,imageId,products})=>({role,content,
+    ...(imageId?{imageId}:{}),
+    ...(role==='assistant' && safeProducts(products).length?{products:safeProducts(products)}:{})}));
+}
 function renderProducts() {
   $('grid').replaceChildren(); $('count').textContent=products.length?t('count')(products.length):'';
   $('resultsSection').hidden=!products.length; $('resultNote').hidden=!products.length; $('resultNote').textContent=t('note');
@@ -447,7 +455,7 @@ async function send(preset) {
   const file=pendingImage;
   let chat=activeChat();
   if (!chat) { chat={id:crypto.randomUUID(),remoteId:null,title:titleFrom(queryText),messages:[],updatedAt:new Date().toISOString()}; chats.unshift(chat); activeId=chat.id; }
-  const context=chat.messages.slice(-8).map(({role,content,imageId})=>({role,content,...(imageId?{imageId}:{})}));
+  const context=searchHistory(chat.messages);
   loading=true; updateSendState(); renderSuggestions();
   requestController=new AbortController(); const sentTo=chat.id;
   let indicator=null;
@@ -489,7 +497,7 @@ async function send(preset) {
 async function regenerate(chat,index) {
   if (loading || chat.messages[index]?.role!=='assistant' || chat.messages[index-1]?.role!=='user') return;
   const question=chat.messages[index-1];
-  const context=chat.messages.slice(0,index-1).slice(-8).map(({role,content,imageId})=>({role,content,...(imageId?{imageId}:{})}));
+  const context=searchHistory(chat.messages.slice(0,index-1));
   const authSearch=!!(question.imageId || context.some(turn=>turn.imageId));
   loading=true; updateSendState(); renderSuggestions();
   const indicator=addMessage('assistant loading',t('searching'));

@@ -1,6 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSearchResult, searchAgent, standaloneExclusion, trustedRetailUrl, verifyProductLinks } from '../search-agent.js';
+import { normalizeSearchResult, resolveProductFollowUp, searchAgent, standaloneExclusion, trustedRetailUrl, verifyProductLinks } from '../search-agent.js';
+
+test('a follow-up keeps the shown products and opens the selected store option', async () => {
+  const history = [
+    { role: 'user', content: 'Maktab uchun ryukzak qidir' },
+    { role: 'assistant', content: 'Ikki variant topdim.', products: [
+      { title: 'Sport ryukzak', store: 'Uzum Market', price: 99000, currency: 'UZS', url: 'https://uzum.uz/uz/product/sport-ryukzak' },
+      { title: 'Kundalik ryukzak', store: 'Uzum Market', price: 250000, currency: 'UZS', url: 'https://uzum.uz/uz/product/kundalik-ryukzak' }
+    ] },
+    { role: 'user', content: 'shu yoqdi' },
+    { role: 'assistant', content: 'Qaysi variant?' }
+  ];
+  assert.equal(resolveProductFollowUp('shu yoqdi', history).type, 'clarify');
+  const result = await searchAgent('birinchisi, shuni sotib ol', history);
+  assert.equal(result.type, 'results');
+  assert.equal(result.products.length, 1);
+  assert.equal(result.products[0].title, 'Sport ryukzak');
+  assert.match(result.reply, /Do‘konda ko‘rish/);
+});
 
 test('standalone exclusions ask a follow-up without a product search', async () => {
   assert.match(standaloneExclusion('menga iPad kerak emas'), /qaysi mahsulot/);

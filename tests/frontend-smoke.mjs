@@ -49,6 +49,7 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     await page.locator('#send').click();
     await page.getByText('Qaysi rangni xohlaysiz?').waitFor();
     assert.equal(requests[1].history[0].content, '200 dollargacha quloqchin');
+    assert.equal(requests[1].history.find(turn => turn.products)?.products[0].title, 'Sony WH-CH720N');
     assert.equal(await page.locator('.card').count(), 2);
     await page.reload();
     assert.equal(await page.locator('.message.user').count(), 2);
@@ -82,6 +83,36 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     await page.locator('#railClose').click();
     await page.getByRole('button', { name: 'Ot uchun egar' }).click();
     assert.equal(requests.at(-1).query, 'Ot uchun egar');
+  } finally { await browser.close(); }
+});
+
+test('an older product result remains available to later follow-ups', async () => {
+  const browser = await chromium.launch({ headless: true, executablePath: browserPath });
+  try {
+    const page = await browser.newPage();
+    let request;
+    await page.route('https://topsiagent.onrender.com/api/search', async route => {
+      request = route.request().postDataJSON();
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ type:'clarify', reply:'Tushundim.', products:[], followUps:[] }) });
+    });
+    await page.goto(url);
+    const messages = [
+      { role:'user', content:'Maktab uchun ryukzak qidir' },
+      { role:'assistant', content:'Ikki variant topdim.', products:[{ title:'Sport ryukzak', store:'Uzum Market', url:'https://uzum.uz/uz/product/sport-ryukzak' }] }
+    ];
+    for (let index=0; index<5; index++) messages.push(
+      { role:'user', content:`Savol ${index}` }, { role:'assistant', content:`Javob ${index}` }
+    );
+    await page.evaluate(value => localStorage.setItem('top_chats_guest_v1',JSON.stringify(value)), [
+      { id:'11111111-1111-4111-8111-111111111111', remoteId:null, title:'Maktab uchun ryukzak', messages, updatedAt:new Date().toISOString() }
+    ]);
+    await page.reload();
+    await page.locator('#historyList .history-open').click();
+    await page.locator('#input').fill('birinchisi, shuni sotib ol');
+    await page.locator('#send').click();
+    await page.getByText('Tushundim.').waitFor();
+    assert.equal(request.history[0].products[0].title, 'Sport ryukzak');
+    assert.equal(request.history.length, 9);
   } finally { await browser.close(); }
 });
 

@@ -150,7 +150,7 @@ app.post("/api/search", async (req, res) => {
   if (typeof query !== "string" || (!query.trim() && !imageId) || query.length > 1000)
     return res.status(400).json({ error: "A query of up to 1000 characters is required" });
   try {
-    const context = Array.isArray(history) ? history.slice(-8) : [];
+    const context = Array.isArray(history) ? history.slice(-12) : [];
     const images = await imageContentForSearch(req, chatId, imageId, context);
     const text = query.trim() || "Shu rasmdagi mahsulotni yoki unga o‘xshash variantlarni top.";
     const result = await searchAgent(text, context, images, imageId);
