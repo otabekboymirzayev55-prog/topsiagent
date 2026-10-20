@@ -120,6 +120,17 @@ export function resolveProductFollowUp(query, history = []) {
   };
 }
 
+export function expandNoPreference(query, history = []) {
+  const text = query.trim().toLocaleLowerCase().replace(/[’‘`]/g, "'");
+  if (!/^(?:menga\s+)?(?:farqi\s+yo'q|baribir|istalgan(?:i)?|no preference|anything is fine|doesn't matter|без разницы|всё равно)[.!\s]*$/i.test(text)) return query;
+  const prior = history.filter(turn => turn?.role === "user" && typeof turn.content === "string")
+    .slice(-3).map(turn => turn.content.trim()).filter(Boolean).join("; ").slice(0, 600);
+  if (!prior) return query;
+  if (/[а-яё]/i.test(text)) return `${query.trim()}. Предыдущий запрос: ${prior}. Нет дополнительных предпочтений по типу, цвету или бюджету. Найдите сейчас подходящие товары в магазинах и покажите варианты по разной цене. Не задавайте дополнительный вопрос.`;
+  if (/no preference|anything is fine|doesn't matter/.test(text)) return `${query.trim()}. Earlier shopping request: ${prior}. There are no further preferences about type, color or budget. Search stores now and show suitable options at different prices. Do not ask another question.`;
+  return `${query.trim()}. Oldingi xarid talabi: ${prior}. Mahsulot turi, rangi va budjet bo‘yicha qo‘shimcha cheklov yo‘q. Oldingi talabga mos mahsulotlarni hozir do‘konlardan qidiring, turli narxdagi variantlarni ko‘rsating. Qo‘shimcha savol bermang.`;
+}
+
 function assistantContext(turn) {
   const reply = turn.content.slice(0, 1200);
   const products = contextProducts(turn.products);
@@ -131,7 +142,7 @@ function assistantContext(turn) {
 }
 
 function verifiedReply(query, found) {
-  if (/\b(?:menga|kerak|dollargacha|o.zbekistonda|narx|mahsulotni|rasmdagi)\b/i.test(query))
+  if (/\b(?:menga|kerak|dollargacha|o.zbekistonda|narx|mahsulotni|rasmdagi|farqi|baribir)\b/i.test(query))
     return found ? "Ishlaydigan do‘kon havolalari bilan mos variantlarni topdim. Narxni do‘konda tekshiring." : "Hozir ishlaydigan mahsulot havolasini tasdiqlay olmadim. Talabni aniqlashtiring yoki qayta urinib ko‘ring.";
   if (/[А-Яа-яЁё]/.test(query))
     return found ? "Нашёл подходящие варианты с рабочими ссылками. Проверьте цену в магазине." : "Не удалось подтвердить рабочую ссылку на товар. Уточните запрос или попробуйте позже.";
@@ -194,7 +205,7 @@ export async function searchAgent(query, history = [], images = new Map(), image
       .map(turn => ({ role: turn.role, content: turn.role === "user"
         ? turnContent(turn.content.slice(0, 1200), turn.imageId, images)
         : assistantContext(turn) })),
-    { role: "user", content: turnContent(query, imageId, images) }
+    { role: "user", content: turnContent(expandNoPreference(query, history), imageId, images) }
   ];
 
   let formatRetries = 0;

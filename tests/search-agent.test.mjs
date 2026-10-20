@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSearchResult, resolveProductFollowUp, searchAgent, standaloneExclusion, trustedRetailUrl, verifyProductLinks } from '../search-agent.js';
+import { expandNoPreference, normalizeSearchResult, resolveProductFollowUp, searchAgent, standaloneExclusion, trustedRetailUrl, verifyProductLinks } from '../search-agent.js';
+
+test('no preference continues the original shopping request', () => {
+  const history = [{ role:'user', content:'menga O‘zbekiston bozoridan sumka qidir' }, { role:'assistant', content:'Qaysi turdagi sumka kerak?' }];
+  assert.match(expandNoPreference("farqi yo'q", history), /sumka qidir/);
+  assert.match(expandNoPreference("farqi yo'q", history), /Qo‘shimcha savol bermang/);
+  assert.equal(expandNoPreference("farqi yo'q", []), "farqi yo'q");
+  assert.equal(expandNoPreference('maktab uchun', history), 'maktab uchun');
+});
 
 test('a follow-up keeps the shown products and opens the selected store option', async () => {
   const history = [
