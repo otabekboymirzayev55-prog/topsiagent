@@ -7,6 +7,28 @@ import { resolve } from 'node:path';
 const url = pathToFileURL(resolve('frontend/index.html')).href;
 const browserPath = process.env.TOPAGENT_BROWSER_PATH || 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe';
 
+async function showRail(page) {
+  const open = await page.locator('#rail').evaluate(el => el.classList.contains('open'));
+  if (!open) await page.locator('#mobileMenu').click();
+  await page.waitForFunction(() => {
+    const rect=document.querySelector('#rail').getBoundingClientRect(); return rect.width>1 && rect.left>=-1;
+  });
+}
+
+async function hideRail(page) {
+  const open = await page.locator('#rail').evaluate(el => el.classList.contains('open'));
+  if (open) await page.locator('#railClose').click();
+  await page.waitForFunction(() => {
+    const rect=document.querySelector('#rail').getBoundingClientRect(); return rect.width<=1 || rect.right<=1;
+  });
+}
+
+async function assertBottomComposer(page, height) {
+  const input=await page.locator('#input').boundingBox();
+  assert.ok(input.y>height*0.78, 'composer remains at the bottom of the viewport');
+  assert.ok(input.y+input.height<height, 'composer remains within the viewport');
+}
+
 test('Top chat keeps context, follow-ups, results and guest history', async () => {
   const browser = await chromium.launch({ headless: true, executablePath: browserPath });
   try {
@@ -23,11 +45,30 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
     });
     await page.goto(url);
-    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(10, 10, 10)');
+    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).color), 'rgb(47, 47, 47)');
+    assert.match(await page.locator('body').evaluate(el => getComputedStyle(el).fontFamily), /^Arial/);
     assert.equal(await page.locator('#chatHeading').innerText(), 'Bugun nima sotib olamiz?');
     assert.equal(await page.locator('.brand').innerText(), 'Top');
+    assert.equal(Math.round((await page.locator('#rail').boundingBox()).width),260);
+    assert.equal(await page.locator('#railClose').isVisible(),true);
+    assert.equal(await page.locator('#accountButton .avatar svg').isVisible(),true);
+    assert.equal(await page.locator('#accountButton').evaluate(el => !!el.closest('#rail')),true);
+    await assertBottomComposer(page,900);
+    const star=page.locator('.welcome-mark .logo-mark polygon');
+    assert.equal(await star.count(),1);
+    assert.equal(await star.evaluate(el => getComputedStyle(el).fill),'rgb(255, 255, 255)');
+    assert.equal((await star.getAttribute('points')).trim().split(/\s+/).length,10);
+    const suggestionBox=await page.locator('#suggestions').boundingBox();
+    assert.ok(suggestionBox.y+suggestionBox.height<(await page.locator('#input').boundingBox()).y,'welcome cards sit above the bottom composer');
+    await hideRail(page);
+    assert.equal(await page.locator('#mobileMenu').isVisible(),true);
+    await showRail(page);
     assert.equal(await page.locator('#send').isDisabled(), true);
-    assert.deepEqual(await page.locator('#suggestions .suggestion').allInnerTexts(), ['Ot uchun egar', 'Nike sneakers', 'Samsung TV']);
+    assert.deepEqual(await page.locator('#suggestions .suggestion strong').allInnerTexts(), ['Ot uchun egar', 'Nike sneakers', 'Samsung TV','Maktab uchun ryukzak']);
+    await page.locator('#suggestions .suggestion').first().click();
+    assert.equal(await page.locator('#input').inputValue(),'Ot uchun egar');
+    assert.equal(requests.length,0,'a welcome suggestion fills the draft without sending it');
     await page.locator('#input').fill('   ');
     assert.equal(await page.locator('#send').isDisabled(), true);
     await page.locator('#input').fill('200 dollargacha quloqchin');
@@ -70,28 +111,87 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     assert.equal(await page.locator('.history-empty').innerText(), 'Mos chat topilmadi');
     await page.locator('#historySearch').fill('');
     assert.equal(await page.locator('#historyList .history-item').count(), 1);
-    await page.locator('#newSearch').click();
+    await showRail(page);
+    await page.locator('#railNew').click();
     assert.equal(await page.locator('#chatHeading').isVisible(), true);
+    await showRail(page);
     await page.locator('#historyList .history-open').click();
     assert.equal(await page.locator('.message.user').count(), 2);
     assert.equal(await page.locator('#language, #languageMobile').count(), 0);
     await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(await page.locator('body').evaluate(el => el.scrollWidth <= innerWidth), true);
-    await page.locator('#mobileNew').click();
+    await showRail(page);
+    await page.locator('#railNew').click();
+    await hideRail(page);
     assert.equal(await page.locator('#chatHeading').isVisible(), true);
     assert.equal(await page.locator('#chatHeading').innerText(), 'Bugun nima sotib olamiz?');
     assert.equal(await page.locator('.brand').innerText(), 'Top');
-    assert.equal(await page.locator('#suggestions .suggestion').count(), 3);
-    assert.equal(await page.locator('#mobileNew').isVisible(), true);
-    assert.equal(await page.locator('#accountButton svg').isVisible(), true);
-    await page.locator('#mobileMenu').click();
-    await page.locator('#themeMobile').click();
+    assert.equal(await page.locator('#suggestions .suggestion').count(), 4);
+    assert.equal(await page.locator('#suggestions').isVisible(),false,'small mobile welcome omits suggestion cards like v0');
+    assert.equal(await page.locator('#mobileNew').count(),0);
+    await assertBottomComposer(page,844);
+    await showRail(page);
+    assert.equal(await page.locator('#accountButton .avatar svg').isVisible(), true);
+    await page.locator('#settingsButton').click();
+    assert.equal(await page.locator('#settingsDialog').isVisible(),true);
+    await page.locator('#themeToggle').click();
+    assert.notEqual(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    await page.locator('#themeToggle').click();
     assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
-    assert.equal(await page.locator('#chatHeading').evaluate(el => getComputedStyle(el).color), 'rgb(29, 79, 131)');
-    await page.locator('#railClose').click();
-    await page.getByRole('button', { name: 'Ot uchun egar' }).click();
+    assert.equal(await page.locator('#chatHeading').evaluate(el => getComputedStyle(el).color), 'rgb(47, 47, 47)');
+    await page.keyboard.press('Escape');
+    await hideRail(page);
+    await page.setViewportSize({width:560,height:844});
+    await page.locator('#suggestions .suggestion').first().click();
+    assert.equal(await page.locator('#input').inputValue(),'Ot uchun egar');
+    assert.equal(requests.length,2);
+    await page.locator('#send').click();
+    await page.getByText('Qaysi rangni xohlaysiz?').waitFor();
     assert.equal(requests.at(-1).query, 'Ot uchun egar');
+    await page.setViewportSize({width:390,height:844});
+    assert.equal(await page.locator('#suggestions').isVisible(),true,'follow-up chips remain visible on small mobile');
   } finally { await browser.close(); }
+});
+
+test('send readiness, thinking motion and IME input behave like a chat app', async () => {
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  let finishResponse;
+  const responseReady=new Promise(resolveResponse=>{finishResponse=resolveResponse;});
+  try {
+    const page=await browser.newPage({viewport:{width:1280,height:900},reducedMotion:'no-preference'});
+    let searches=0;
+    await page.route('https://topsiagent.onrender.com/api/search',async route=>{
+      searches++;
+      await responseReady;
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({type:'clarify',reply:'Qanday rangdagi egar kerak?',products:[],followUps:['Qizil','Jigarrang']})});
+    });
+    await page.goto(url);
+    assert.equal(await page.locator('#send').isDisabled(),true);
+    assert.equal(await page.locator('#send').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(229, 229, 229)');
+    await page.locator('#input').fill('Ot uchun egar qidir');
+    assert.equal(await page.locator('#send').isEnabled(),true);
+    await page.waitForFunction(()=>getComputedStyle(document.querySelector('#send')).backgroundColor==='rgb(47, 47, 47)');
+    await page.locator('#input').dispatchEvent('keydown',{key:'Enter',code:'Enter',keyCode:229,isComposing:true,bubbles:true});
+    await page.evaluate(()=>new Promise(resolveFrame=>requestAnimationFrame(()=>requestAnimationFrame(resolveFrame))));
+    assert.equal(searches,0,'IME composition Enter must not submit a message');
+    assert.equal(await page.locator('#input').inputValue(),'Ot uchun egar qidir');
+    await page.locator('#input').press('Enter');
+    await page.locator('.message.loading .thinking-dots').waitFor();
+    assert.equal(searches,1);
+    assert.equal(await page.locator('#send').isDisabled(),true);
+    assert.equal(await page.locator('.thinking-dots i').count(),3);
+    assert.equal(await page.locator('.thinking-dots i').first().evaluate(el=>getComputedStyle(el).animationName),'thinking');
+    await page.emulateMedia({reducedMotion:'reduce'});
+    assert.equal(await page.locator('.thinking-dots i').first().evaluate(el=>getComputedStyle(el).animationName),'none');
+    assert.ok((await page.locator('#rail').evaluate(el=>getComputedStyle(el).transitionDuration)).split(',').every(duration=>Number.parseFloat(duration)===0));
+    finishResponse();
+    await page.getByText('Qanday rangdagi egar kerak?').waitFor();
+    assert.equal(await page.locator('.thinking-dots').count(),0);
+    assert.equal(await page.getByRole('button',{name:'Nusxalash',exact:true}).count(),1);
+    assert.equal(await page.getByRole('button',{name:'Qayta yaratish',exact:true}).count(),1);
+    assert.equal(await page.locator('.message.assistant').evaluate(el=>getComputedStyle(el).animationName),'none');
+    assert.equal(await page.locator('#send').isDisabled(),true);
+  } finally { finishResponse(); await browser.close(); }
 });
 
 test('an older product result remains available to later follow-ups', async () => {
@@ -115,6 +215,7 @@ test('an older product result remains available to later follow-ups', async () =
       { id:'11111111-1111-4111-8111-111111111111', remoteId:null, title:'Maktab uchun ryukzak', messages, updatedAt:new Date().toISOString() }
     ]);
     await page.reload();
+    await showRail(page);
     await page.locator('#historyList .history-open').click();
     await page.locator('#input').fill('birinchisi, shuni sotib ol');
     await page.locator('#send').click();
@@ -143,12 +244,14 @@ test('sign-in moves guest chats to the account and loads them on return', async 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(url);
     assert.equal(await page.locator('#workspace').evaluate(el => el.classList.contains('signed-in')), false);
-    assert.equal(await page.locator('#mobileMenu').isVisible(), false);
-    assert.equal(await page.locator('#mobileNew').isVisible(), false);
-    assert.equal(await page.locator('#themeToggle').isVisible(), true);
-    assert.ok((await page.locator('.composer').boundingBox()).y < 0.72 * 844);
+    assert.equal(await page.locator('#railClose').isVisible(), true);
+    assert.equal(await page.locator('#mobileNew').count(), 0);
+    assert.equal(await page.locator('#themeToggle').isVisible(), false);
+    await hideRail(page);
+    await assertBottomComposer(page,844);
     await page.locator('#input').fill('Menga noutbuk kerak'); await page.locator('#send').click();
     await page.getByText('Qancha budjet ajratasiz?').waitFor();
+    await showRail(page);
     await page.locator('#accountButton').click();
     await page.locator('#authEmail').fill('test@example.com'); await page.locator('#authPassword').fill('password123');
     await page.locator('#authSubmit').click();
@@ -158,9 +261,11 @@ test('sign-in moves guest chats to the account and loads them on return', async 
     await page.reload();
     await page.getByText('Qancha budjet ajratasiz?').waitFor();
     assert.equal(await page.locator('#historyList .history-item').count(),1);
-    await page.locator('#mobileNew').click();
+    await showRail(page);
+    await page.locator('#railNew').click();
+    await hideRail(page);
     assert.equal(await page.locator('#workspace').evaluate(el => el.classList.contains('signed-in')), true);
-    assert.ok((await page.locator('.composer').boundingBox()).y > 0.75 * 844);
+    await assertBottomComposer(page,844);
     assert.equal(await page.locator('#chatHeading').isVisible(), true);
   } finally { await browser.close(); }
 });
@@ -196,6 +301,7 @@ test('signed-in chat can attach an image, rename, share, regenerate and delete s
     });
     page.on('dialog',dialog=>dialog.accept());
     await page.goto(url);
+    await hideRail(page);
     await page.locator('#attach').click();
     assert.equal(await page.locator('#authDialog').isVisible(),true);
     await page.locator('#authEmail').fill('test@example.com'); await page.locator('#authPassword').fill('password123');
@@ -213,16 +319,16 @@ test('signed-in chat can attach an image, rename, share, regenerate and delete s
     assert.equal(searches[0].imageId,imageId);
     assert.equal(searches[0].chatId,chatId);
     assert.equal(chats[0].messages[0].imageId,imageId);
-    await page.locator('.message-actions button').filter({hasText:'Qayta yaratish'}).click();
+    await page.getByRole('button',{name:'Qayta yaratish',exact:true}).click();
     await page.getByText('Javob 2').waitFor();
     assert.equal(await page.getByText('Javob 1').count(),0);
-    await page.locator('#mobileMenu').click();
+    await showRail(page);
     await page.locator('.history-more').click();
     await page.getByRole('button',{name:'Nomini o‘zgartirish'}).click();
     await page.locator('#renameInput').fill('Qizil egar');
     await page.locator('#renameForm button[type=submit]').click();
     await page.getByRole('button',{name:'Qizil egar',exact:true}).waitFor();
-    await page.locator('#mobileMenu').click();
+    await showRail(page);
     await page.locator('.history-more').click();
     await page.getByRole('button',{name:'Ulashish',exact:true}).click();
     assert.match(await page.locator('#shareDialog').innerText(),/keyingi xabarlari va rasmlarini/);
@@ -235,7 +341,7 @@ test('signed-in chat can attach an image, rename, share, regenerate and delete s
     assert.equal(await page.locator('#sharedMessages .message').count(),2);
     assert.equal(await page.locator('#input').isVisible(),false);
     await page.goto(url);
-    await page.locator('#mobileMenu').click();
+    await showRail(page);
     await page.locator('.history-more').click();
     await page.getByRole('button',{name:'Ulashish',exact:true}).click();
     await page.locator('#createShare').click();
@@ -244,12 +350,12 @@ test('signed-in chat can attach an image, rename, share, regenerate and delete s
     await page.goto(`${url}?share=${shareId}`);
     await page.getByText('Havola muddati tugagan, bekor qilingan yoki chat o‘chirilgan.').waitFor();
     await page.goto(url);
-    await page.locator('#mobileMenu').click();
+    await showRail(page);
     await page.locator('.history-more').click();
     await page.getByRole('button',{name:'Chatni o‘chirish'}).click();
     await page.getByRole('button',{name:'Qizil egar',exact:true}).waitFor();
     failDelete=false;
-    await page.locator('#mobileMenu').click();
+    await showRail(page);
     await page.locator('.history-more').click();
     await page.getByRole('button',{name:'Chatni o‘chirish'}).click();
     await page.locator('.history-item').waitFor({state:'detached'});
