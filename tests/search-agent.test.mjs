@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { expandNoPreference, normalizeSearchResult, resolveProductFollowUp, searchAgent, standaloneExclusion, trustedRetailUrl, verifyProductLinks } from '../search-agent.js';
+import { expandNoPreference, normalizeSearchResult, resolveProductFollowUp, searchAgent, standaloneExclusion, trustedRetailUrl, verifiedReply, verifyProductLinks } from '../search-agent.js';
+
+test('verified-link fallback uses Uzbek by default and follows clear language cues', () => {
+  assert.match(verifiedReply('manga uzbekiston bozoridan sumka qidir', true), /Do‘kon havolalari/);
+  assert.match(verifiedReply('Nike sneakers', false), /Hozir mahsulot/);
+  assert.match(verifiedReply('Find a backpack under 50 dollars', true), /I found matching/);
+  assert.match(verifiedReply('Найди рюкзак', true), /Нашёл/);
+});
 
 test('no preference continues the original shopping request', () => {
   const history = [{ role:'user', content:'menga O‘zbekiston bozoridan sumka qidir' }, { role:'assistant', content:'Qaysi turdagi sumka kerak?' }];
@@ -25,7 +32,8 @@ test('a follow-up keeps the shown products and opens the selected store option',
   assert.equal(result.type, 'results');
   assert.equal(result.products.length, 1);
   assert.equal(result.products[0].title, 'Sport ryukzak');
-  assert.match(result.reply, /Do‘konda ko‘rish/);
+  assert.match(result.reply, /Xarid variantlari/);
+  assert.match(result.reply, /avtomatik xarid hozircha tayyor emas/);
 });
 
 test('standalone exclusions ask a follow-up without a product search', async () => {

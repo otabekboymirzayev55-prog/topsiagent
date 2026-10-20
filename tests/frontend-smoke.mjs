@@ -37,6 +37,13 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     await page.locator('.card').first().waitFor();
     assert.equal(await page.locator('#send').isDisabled(), true);
     assert.equal(await page.locator('.card').count(), 2);
+    await page.locator('.card .purchase-choices button').first().click();
+    assert.equal(await page.locator('#purchaseDialog').isVisible(), true);
+    assert.match(await page.locator('#purchaseProduct').innerText(), /Sony WH-CH720N/);
+    assert.equal(await page.locator('#purchaseAuto').isDisabled(), true);
+    assert.equal(await page.locator('#purchaseStore').getAttribute('href'), 'https://example.com/sony');
+    assert.match(await page.locator('#purchaseStatus').innerText(), /hali qo‘llamaydi/);
+    await page.locator('#closePurchase').click();
     assert.ok((await page.locator('#suggestions').innerText()).includes('Boshqa tavsiyalarni ko‘rsat'));
     assert.ok((await page.locator('#suggestions').innerText()).includes('Batareyasi uzoqroq bo‘lsin'));
     await page.locator('.compare-pick input').nth(0).check();
@@ -51,6 +58,7 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     assert.equal(requests[1].history[0].content, '200 dollargacha quloqchin');
     assert.equal(requests[1].history.find(turn => turn.products)?.products[0].title, 'Sony WH-CH720N');
     assert.equal(await page.locator('.card').count(), 2);
+    assert.match(await page.locator('#suggestions').innerText(), /Xarid variantlari/);
     await page.reload();
     assert.equal(await page.locator('.message.user').count(), 2);
     assert.equal(await page.locator('.card').count(), 2);

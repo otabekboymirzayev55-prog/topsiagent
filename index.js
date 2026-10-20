@@ -1,11 +1,9 @@
 import express from "express";
 import cors from "cors";
 import { randomUUID } from "node:crypto";
-import { checkoutAgent } from "./checkout-agent.js";
 import { searchAgent } from "./search-agent.js";
 import {
-  requireAuth, upsertProfile, getProfile,
-  saveCard, getDefaultCard, saveOrder, getOrders
+  requireAuth, upsertProfile, getProfile, getOrders
 } from "./auth.js";
 import { supabase, createAuthClient } from "./supabase.js";
 import { registerChatFeatureRoutes, validImageId, imageContentForSearch, validateChatImageRefs, deleteChatWithImages } from "./chat-features.js";
@@ -116,8 +114,8 @@ registerChatFeatureRoutes(app);
 // ── Profile: save ────────────────────────────────────────────────────────────
 app.post("/api/profile", requireAuth, async (req, res) => {
   try {
+    if (req.body?.card) return res.status(400).json({ error: "Card details are not accepted. Use a supported payment provider when available." });
     await upsertProfile(req.user.id, req.body.profile);
-    if (req.body.card) await saveCard(req.user.id, req.body.card);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -160,62 +158,17 @@ app.post("/api/search", async (req, res) => {
   }
 });
 
-// ── Checkout (SSE stream) ─────────────────────────────────────────────────────
-app.post("/api/checkout", requireAuth, async (req, res) => {
-  const { product } = req.body;
-  if (!product?.url) return res.status(400).json({ error: "product.url required" });
+// Only a retailer-authorized order integration may enable automatic checkout.
+// The legacy browser agent sent raw card credentials to an LLM; never use it.
+app.get("/api/checkout/options", (_req, res) => res.json({
+  automatic: { available: false, retailer: "Uzum Market", reason: "Uzum Market xaridor buyurtmasi integratsiyasi hali ulanmagan." },
+  storeCheckout: true,
+}));
 
-  // Load user's saved profile + decrypted card from Supabase
-  let userProfile, cardData;
-  try {
-    userProfile = await getProfile(req.user.id);
-    cardData    = await getDefaultCard(req.user.id);
-  } catch (err) {
-    return res.status(400).json({ error: "No profile/card on file. Please save your details first." });
-  }
-
-  // Merge profile + card into one object for the agent
-  const fullProfile = {
-    firstName:  userProfile.first_name,
-    lastName:   userProfile.last_name,
-    email:      userProfile.email,
-    phone:      userProfile.phone,
-    address:    userProfile.address,
-    city:       userProfile.city,
-    state:      userProfile.state,
-    zip:        userProfile.zip,
-    country:    userProfile.country,
-    cardNumber: cardData?.number,
-    cardExpiry: cardData?.expiry,
-    cardCvv:    cardData?.cvv,
-  };
-
-  // SSE stream
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders();
-
-  const emit = (event, data) =>
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-
-  try {
-    const result = await checkoutAgent({ product, userProfile: fullProfile, emit });
-
-    // Save order to Supabase
-    const order = await saveOrder(req.user.id, {
-      product,
-      orderRef: result.orderId,
-    });
-
-    emit("done", { success: true, orderId: result.orderId, dbOrderId: order.id });
-  } catch (err) {
-    console.error("[checkout]", err.message);
-    emit("error", { message: err.message });
-  } finally {
-    res.end();
-  }
-});
+app.post("/api/checkout", requireAuth, (_req, res) => res.status(503).json({
+  code: "CHECKOUT_NOT_CONFIGURED",
+  error: "Top orqali avtomatik xarid hozircha mavjud emas. Mahsulotni do‘kon sahifasida xarid qilishingiz mumkin.",
+}));
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`TopAgent server → http://localhost:${PORT}`));

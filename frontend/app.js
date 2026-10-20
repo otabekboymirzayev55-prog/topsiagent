@@ -9,7 +9,7 @@ const copy = {
     heading:'Bugun nima sotib olamiz?', new:'Yangi chat', history:'Chat tarixi', guest:'Mehmon tarixi shu brauzerda saqlanadi.', synced:'Chatlar hisobingizda saqlanadi.', syncError:'Sinxronlashmadi. Chat shu brauzerda saqlangan.',
     signIn:'Kirish', signOut:'Chiqish', signUp:'Hisob ochish', haveAccount:'Hisobingiz bormi? Kirish', createAccount:'Hisob ochish', authIntro:'Hisobga kirsangiz, chatlaringiz keyingi safar ham saqlanadi.', confirmEmail:'Emailingizga kelgan tasdiqlash havolasini oching, so‘ng kiring.',
     placeholder:'Qidiring...', examples:['Ot uchun egar','Nike sneakers','Samsung TV'], searching:'Qidiryapman…', error:'Qidiruvda xatolik yuz berdi. Qayta urinib ko‘ring.',
-    results:'Tavsiyalar', count:n=>`${n} ta variant`, note:'Narx va mavjudlikni do‘kon sahifasida tekshiring.', open:'Do‘konda ko‘rish ↗', buy:'Eng mosini sotib olish ↗', more:'Boshqa tavsiyalarni ko‘rsat', cheaper:'Arzonrog‘i bormi?',
+    results:'Tavsiyalar', count:n=>`${n} ta variant`, note:'Narx va mavjudlikni do‘kon sahifasida tekshiring.', open:'Do‘konda xarid qilish ↗', buy:'Xarid variantlari', autoBuy:'Top orqali xarid', autoUnavailable:'Top orqali avtomatik xarid hozircha mavjud emas. Uzum Market bilan buyurtma integratsiyasi tayyor bo‘lgach ishlaydi.', autoOther:'Top bu do‘kon orqali avtomatik xaridni hali qo‘llamaydi. Do‘konda o‘zingiz xarid qilishingiz mumkin.', more:'Boshqa tavsiyalarni ko‘rsat', cheaper:'Arzonrog‘i bormi?',
     compare:'Solishtirish', selected:n=>`${n} ta tanlandi`, compareTitle:'Mahsulotlarni solishtirish', priceUnknown:'Narx ko‘rsatilmagan', store:'Do‘kon', price:'Narx', fit:'Nima uchun mos', product:'Mahsulot', link:'Havola',
     delete:'Chatni o‘chirish', deleteConfirm:'Bu chatni o‘chirasizmi?', authFail:'Kirish amalga oshmadi.', historyFail:'Tarixni yuklab bo‘lmadi.', mode:'Faqat xarid uchun', darkTheme:'Qora rejim', whiteTheme:'Oq rejim',
     rename:'Nomini o‘zgartirish', share:'Ulashish', copyAnswer:'Nusxalash', regenerate:'Qayta yaratish', imageError:'Faqat JPEG, PNG yoki WebP rasm (5 MB gacha) tanlang.', imageOnly:'Shu rasmdagi mahsulotni yoki unga o‘xshash variantlarni top.', signInForImage:'Rasm bilan qidirish uchun hisobga kiring.'
@@ -18,7 +18,7 @@ const copy = {
     heading:'What are we buying today?', new:'New chat', history:'Chat history', guest:'Guest history is saved in this browser.', synced:'Chats are saved to your account.', syncError:'Could not sync. This chat is saved in this browser.',
     signIn:'Sign in', signOut:'Sign out', signUp:'Create account', haveAccount:'Already have an account? Sign in', createAccount:'Create account', authIntro:'Sign in to keep your chats for your next visit.', confirmEmail:'Open the confirmation link in your email, then sign in.',
     placeholder:'What would you like to buy?', examples:['Headphones under $200','Laptop for coding','Redmi Note 14 in the US'], searching:'Searching…', error:'Search failed. Please try again.',
-    results:'Recommendations', count:n=>`${n} options`, note:'Check price and availability at the store.', open:'View at store ↗', buy:'Buy the top pick ↗', more:'Show other options', cheaper:'Anything cheaper?',
+    results:'Recommendations', count:n=>`${n} options`, note:'Check price and availability at the store.', open:'Buy at store ↗', buy:'Purchase options', autoBuy:'Buy through Top', autoUnavailable:'Automatic purchase through Top is not available yet. It needs a retailer order integration.', autoOther:'Top cannot automatically purchase from this store yet. You can buy on the store page.', more:'Show other options', cheaper:'Anything cheaper?',
     compare:'Compare', selected:n=>`${n} selected`, compareTitle:'Compare products', priceUnknown:'Price unavailable', store:'Store', price:'Price', fit:'Why it fits', product:'Product', link:'Link',
     delete:'Delete chat', deleteConfirm:'Delete this chat?', authFail:'Sign in failed.', historyFail:'Could not load history.', mode:'Shopping only', dark:'Dark mode', light:'Light mode'
   },
@@ -26,7 +26,7 @@ const copy = {
     heading:'Что купим сегодня?', new:'Новый чат', history:'История чатов', guest:'История гостя хранится в этом браузере.', synced:'Чаты сохранены в аккаунте.', syncError:'Не удалось синхронизировать. Чат сохранён в браузере.',
     signIn:'Войти', signOut:'Выйти', signUp:'Создать аккаунт', haveAccount:'Уже есть аккаунт? Войти', createAccount:'Создать аккаунт', authIntro:'Войдите, чтобы сохранить чаты для следующего визита.', confirmEmail:'Откройте ссылку подтверждения в письме, затем войдите.',
     placeholder:'Что хотите купить?', examples:['Наушники до $200','Ноутбук для программирования','Redmi Note 14 в России'], searching:'Ищу…', error:'Ошибка поиска. Попробуйте ещё раз.',
-    results:'Рекомендации', count:n=>`${n} варианта`, note:'Проверьте цену и наличие в магазине.', open:'Открыть магазин ↗', buy:'Купить лучший вариант ↗', more:'Показать другие варианты', cheaper:'Есть дешевле?',
+    results:'Рекомендации', count:n=>`${n} варианта`, note:'Проверьте цену и наличие в магазине.', open:'Купить в магазине ↗', buy:'Варианты покупки', autoBuy:'Купить через Top', autoUnavailable:'Автоматическая покупка через Top пока недоступна. Нужна интеграция с магазином.', autoOther:'Top пока не может автоматически купить товар в этом магазине. Вы можете купить его на сайте магазина.', more:'Показать другие варианты', cheaper:'Есть дешевле?',
     compare:'Сравнить', selected:n=>`${n} выбрано`, compareTitle:'Сравнение товаров', priceUnknown:'Цена неизвестна', store:'Магазин', price:'Цена', fit:'Почему подходит', product:'Товар', link:'Ссылка',
     delete:'Удалить чат', deleteConfirm:'Удалить этот чат?', authFail:'Не удалось войти.', historyFail:'Не удалось загрузить историю.', mode:'Только покупки', dark:'Тёмная тема', light:'Светлая тема'
   }
@@ -278,7 +278,22 @@ function priceText(product) {
   catch { return `${product.price} ${product.currency||'USD'}`; }
 }
 function span(cls,text) { const node=document.createElement('span'); node.className=cls; node.textContent=text; return node; }
-function safeProducts(value) { return Array.isArray(value) ? value.filter(p=>p && typeof p.title==='string' && typeof p.store==='string' && /^https:\/\//.test(p.url)).slice(0,4) : []; }
+function safeProducts(value) { return Array.isArray(value) ? value.filter(p=>{
+  if (!p || typeof p.title!=='string' || typeof p.store!=='string' || typeof p.url!=='string') return false;
+  try { return new URL(p.url).protocol==='https:'; } catch { return false; }
+}).slice(0,4) : []; }
+function openPurchaseOptions(product) {
+  $('purchaseProduct').textContent=`${product.title} · ${priceText(product)} · ${product.store}`;
+  $('purchaseStore').href=product.url;
+  $('purchaseStore').textContent=t('open');
+  $('purchaseAuto').textContent=t('autoBuy');
+  $('purchaseAuto').disabled=true;
+  const host=new URL(product.url).hostname;
+  $('purchaseStatus').textContent=host==='uzum.uz'||host.endsWith('.uzum.uz')?t('autoUnavailable'):t('autoOther');
+  $('purchaseDialog').classList.add('open');
+  $('purchaseStore').focus();
+}
+function closePurchaseOptions() { $('purchaseDialog').classList.remove('open'); }
 function searchHistory(messages) {
   const recent=messages.slice(-8);
   const lastResult=[...messages].reverse().find(message=>message.role==='assistant' && safeProducts(message.products).length);
@@ -297,10 +312,13 @@ function renderProducts() {
     const price=document.createElement('div'); price.append(span(p.price==null?'price-unknown':'price',priceText(p)));
     const reason=document.createElement('p'); reason.className='reason'; reason.textContent=p.why||'';
     const bottom=document.createElement('div'); bottom.className='card-bottom';
-    const link=document.createElement('a'); link.className='store-link'; link.textContent=t('open'); link.href=p.url; link.target='_blank'; link.rel='noopener noreferrer';
+    const choices=document.createElement('div'); choices.className='purchase-choices';
+    const buy=document.createElement('button'); buy.type='button'; buy.className='store-link'; buy.textContent=t('buy'); buy.addEventListener('click',()=>openPurchaseOptions(p));
+    const link=document.createElement('a'); link.className='store-link secondary'; link.textContent=t('open'); link.href=p.url; link.target='_blank'; link.rel='noopener noreferrer';
+    choices.append(buy,link);
     const label=document.createElement('label'); label.className='compare-pick'; const box=document.createElement('input'); box.type='checkbox'; box.checked=selected.has(i); box.setAttribute('aria-label',`${t('compare')}: ${p.title}`);
     box.addEventListener('change',()=>{ if(box.checked && selected.size>=3){box.checked=false;return;} box.checked?selected.add(i):selected.delete(i); updateCompare(); }); label.append(box,document.createTextNode(t('compare')));
-    bottom.append(link,label); card.append(top,title,price,reason,bottom); $('grid').append(card);
+    bottom.append(choices,label); card.append(top,title,price,reason,bottom); $('grid').append(card);
   });
   updateCompare();
 }
@@ -326,13 +344,15 @@ function renderSuggestions() {
     parts.forEach(text=>suggestion(text,()=>send(text)));
     return;
   }
-  const chat=activeChat(); const last=[...(chat?.messages||[])].reverse().find(m=>m.role==='assistant');
+  const chat=activeChat(); const answers=[...(chat?.messages||[])].reverse().filter(m=>m.role==='assistant');
+  const last=answers[0];
   if (!last) {
     if (!loading && !draft) t('examples').forEach(text=>suggestion(text,()=>send(text)));
     return;
   }
-  if (safeProducts(last.products).length) {
-    suggestion(t('buy'),()=>window.open(last.products[0].url,'_blank','noopener,noreferrer'),true);
+  const resultProducts=safeProducts(answers.find(answer=>safeProducts(answer.products).length)?.products);
+  if (resultProducts.length) {
+    suggestion(t('buy'),()=>openPurchaseOptions(resultProducts[0]),true);
     suggestion(t('more'),()=>send(t('more')));
     suggestion(t('cheaper'),()=>send(t('cheaper')));
   }
@@ -558,6 +578,8 @@ $('themeToggle').addEventListener('click',()=>{darkTheme=!darkTheme;localStorage
 $('themeMobile').addEventListener('click',()=>{darkTheme=!darkTheme;localStorage.setItem('topagent_theme',darkTheme?'dark':'light');updateTheme();});
 $('compareAction').addEventListener('click',showCompare); $('closeDialog').addEventListener('click',()=>$('compareDialog').classList.remove('open'));
 $('compareDialog').addEventListener('click',event=>{if(event.target===$('compareDialog'))$('compareDialog').classList.remove('open');});
+$('closePurchase').addEventListener('click',closePurchaseOptions);
+$('purchaseDialog').addEventListener('click',event=>{if(event.target===$('purchaseDialog'))closePurchaseOptions();});
 $('accountButton').addEventListener('click',openAuth); $('closeAuth').addEventListener('click',closeAuth);
 $('authDialog').addEventListener('click',event=>{if(event.target===$('authDialog'))closeAuth();});
 $('authForm').addEventListener('submit',submitAuth);
@@ -575,7 +597,7 @@ $('textShare').addEventListener('click',shareText);
 $('revokeShare').addEventListener('click',revokeShare);
 for(const id of ['renameDialog','shareDialog']) $(id).addEventListener('click',event=>{if(event.target===$(id))$(id).classList.remove('open');});
 document.addEventListener('click',event=>{if(!event.target.closest('.history-menu-wrap'))document.querySelectorAll('.history-menu').forEach(node=>node.hidden=true);});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'){$('compareDialog').classList.remove('open');closeAuth();closeRename();closeShare();closeRail();document.querySelectorAll('.history-menu').forEach(node=>node.hidden=true);}});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){$('compareDialog').classList.remove('open');closePurchaseOptions();closeAuth();closeRename();closeShare();closeRail();document.querySelectorAll('.history-menu').forEach(node=>node.hidden=true);}});
 
 setLanguage(lang);
 updateSendState();
