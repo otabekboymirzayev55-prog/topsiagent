@@ -8,6 +8,7 @@ TopAgent is a conversational product finder. The responsive web interface asks f
 - `index.js`: Express API deployed to Render at `https://topsiagent.onrender.com`
 - `search-agent.js`: Anthropic Claude with web search for product discovery
 - `auth.js`, `supabase-chats.sql`: account sessions, saved chats, private image storage and 24-hour share links
+- Guest chats stay in the current page only. Signing in saves that visit's chats to the account; leaving or reloading the page clears guest history, including browser-stored guest chats from older releases.
 - Purchase options show both Top and retailer paths. Retailer links work now; Top automatic checkout remains unavailable until an authorized buyer-order integration is connected.
 
 ## Local development

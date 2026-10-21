@@ -3,10 +3,12 @@ const $ = id => document.getElementById(id);
 
 // Remove a legacy copy that could contain payment details.
 localStorage.removeItem('topagent_profile');
+localStorage.removeItem('top_chats_guest_v1');
+localStorage.removeItem('top_active_guest_v1');
 
 const copy = {
   uz: {
-    heading:'Bugun nima sotib olamiz?', new:'Yangi chat', history:'Chat tarixi', guest:'Mehmon tarixi shu brauzerda saqlanadi.', synced:'Chatlar hisobingizda saqlanadi.', syncError:'Sinxronlashmadi. Chat shu brauzerda saqlangan.',
+    heading:'Bugun nima sotib olamiz?', new:'Yangi chat', history:'Chat tarixi', guest:'Mehmon chatlari sahifadan chiqqanda o‘chadi.', synced:'Chatlar hisobingizda saqlanadi.', syncError:'Sinxronlashmadi. Chat shu brauzerda saqlangan.',
     signIn:'Kirish', signOut:'Chiqish', signUp:'Hisob ochish', haveAccount:'Hisobingiz bormi? Kirish', createAccount:'Hisob ochish', authIntro:'Hisobga kirsangiz, chatlaringiz keyingi safar ham saqlanadi.', confirmEmail:'Emailingizga kelgan tasdiqlash havolasini oching, so‘ng kiring.', expiredEmail:'Tasdiqlash havolasi eskirgan yoki ishlatilgan. Yangi havola yuboring.', confirmedEmail:'Email tasdiqlandi. Endi hisobga kiring.', resendEmail:'Havolani qayta yuborish', resendSent:'Yangi havola yuborildi. Eng so‘nggi xatni oching.',
     placeholder:'Top’ga yozing', examples:['Ot uchun egar','Nike sneakers','Samsung TV','Maktab uchun ryukzak'], searching:'Qidiryapman', error:'Qidiruvda xatolik yuz berdi. Qayta urinib ko‘ring.',
     results:'Tavsiyalar', count:n=>`${n} ta variant`, note:'Narx va mavjudlikni do‘kon sahifasida tekshiring.', open:'Do‘konda xarid qilish ↗', buy:'Xarid variantlari', autoBuy:'Top orqali xarid', autoUnavailable:'Top orqali avtomatik xarid hozircha mavjud emas. Uzum Market bilan buyurtma integratsiyasi tayyor bo‘lgach ishlaydi.', autoOther:'Top bu do‘kon orqali avtomatik xaridni hali qo‘llamaydi. Do‘konda o‘zingiz xarid qilishingiz mumkin.', more:'Boshqa tavsiyalarni ko‘rsat', cheaper:'Arzonrog‘i bormi?',
@@ -15,7 +17,7 @@ const copy = {
     rename:'Nomini o‘zgartirish', share:'Ulashish', copyAnswer:'Nusxalash', regenerate:'Qayta yaratish', imageError:'Faqat JPEG, PNG yoki WebP rasm (5 MB gacha) tanlang.', imageOnly:'Shu rasmdagi mahsulotni yoki unga o‘xshash variantlarni top.', signInForImage:'Rasm bilan qidirish uchun hisobga kiring.'
   },
   en: {
-    heading:'What are we buying today?', new:'New chat', history:'Chat history', guest:'Guest history is saved in this browser.', synced:'Chats are saved to your account.', syncError:'Could not sync. This chat is saved in this browser.',
+    heading:'What are we buying today?', new:'New chat', history:'Chat history', guest:'Guest chats disappear when you leave the page.', synced:'Chats are saved to your account.', syncError:'Could not sync. This chat is saved in this browser.',
     signIn:'Sign in', signOut:'Sign out', signUp:'Create account', haveAccount:'Already have an account? Sign in', createAccount:'Create account', authIntro:'Sign in to keep your chats for your next visit.', confirmEmail:'Open the confirmation link in your email, then sign in.',
     placeholder:'What would you like to buy?', examples:['Headphones under $200','Laptop for coding','Redmi Note 14 in the US'], searching:'Searching…', error:'Search failed. Please try again.',
     results:'Recommendations', count:n=>`${n} options`, note:'Check price and availability at the store.', open:'Buy at store ↗', buy:'Purchase options', autoBuy:'Buy through Top', autoUnavailable:'Automatic purchase through Top is not available yet. It needs a retailer order integration.', autoOther:'Top cannot automatically purchase from this store yet. You can buy on the store page.', more:'Show other options', cheaper:'Anything cheaper?',
@@ -23,7 +25,7 @@ const copy = {
     delete:'Delete chat', deleteConfirm:'Delete this chat?', authFail:'Sign in failed.', historyFail:'Could not load history.', mode:'Shopping only', dark:'Dark mode', light:'Light mode'
   },
   ru: {
-    heading:'Что купим сегодня?', new:'Новый чат', history:'История чатов', guest:'История гостя хранится в этом браузере.', synced:'Чаты сохранены в аккаунте.', syncError:'Не удалось синхронизировать. Чат сохранён в браузере.',
+    heading:'Что купим сегодня?', new:'Новый чат', history:'История чатов', guest:'Гостевые чаты исчезнут после ухода со страницы.', synced:'Чаты сохранены в аккаунте.', syncError:'Не удалось синхронизировать. Чат сохранён в браузере.',
     signIn:'Войти', signOut:'Выйти', signUp:'Создать аккаунт', haveAccount:'Уже есть аккаунт? Войти', createAccount:'Создать аккаунт', authIntro:'Войдите, чтобы сохранить чаты для следующего визита.', confirmEmail:'Откройте ссылку подтверждения в письме, затем войдите.',
     placeholder:'Что хотите купить?', examples:['Наушники до $200','Ноутбук для программирования','Redmi Note 14 в России'], searching:'Ищу…', error:'Ошибка поиска. Попробуйте ещё раз.',
     results:'Рекомендации', count:n=>`${n} варианта`, note:'Проверьте цену и наличие в магазине.', open:'Купить в магазине ↗', buy:'Варианты покупки', autoBuy:'Купить через Top', autoUnavailable:'Автоматическая покупка через Top пока недоступна. Нужна интеграция с магазином.', autoOther:'Top пока не может автоматически купить товар в этом магазине. Вы можете купить его на сайте магазина.', more:'Показать другие варианты', cheaper:'Есть дешевле?',
@@ -36,8 +38,8 @@ let lang = 'uz';
 let darkTheme = localStorage.getItem('top_v0_theme_v1') === 'dark';
 let session = readJson('top_session_v1', null);
 let user = session?.user || null;
-let chats = readChats();
-let activeId = localStorage.getItem(activeKey()) || null;
+let chats = user ? readChats() : [];
+let activeId = user ? localStorage.getItem(activeKey()) || null : null;
 let products = [];
 let selected = new Set();
 let loading = false;
@@ -55,13 +57,15 @@ let dialogReturnFocus = null;
 
 function t(key) { return copy[lang][key]; }
 function readJson(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
-function storageKey() { return user ? `top_chats_user_${user.id}` : 'top_chats_guest_v1'; }
-function activeKey() { return user ? `top_active_user_${user.id}` : 'top_active_guest_v1'; }
-function readChats() { const value = readJson(storageKey(), []); return Array.isArray(value) ? value.filter(chat => chat && typeof chat.id === 'string' && Array.isArray(chat.messages)) : []; }
+function storageKey() { return `top_chats_user_${user.id}`; }
+function activeKey() { return `top_active_user_${user.id}`; }
+function readChats() { if (!user) return []; const value = readJson(storageKey(), []); return Array.isArray(value) ? value.filter(chat => chat && typeof chat.id === 'string' && Array.isArray(chat.messages)) : []; }
 function persist() {
   chats.sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-  try { localStorage.setItem(storageKey(), JSON.stringify(chats)); } catch { syncFailed = true; updateAccountUI(); }
-  if (activeId) localStorage.setItem(activeKey(), activeId); else localStorage.removeItem(activeKey());
+  if (user) {
+    try { localStorage.setItem(storageKey(), JSON.stringify(chats)); } catch { syncFailed = true; updateAccountUI(); }
+    if (activeId) localStorage.setItem(activeKey(), activeId); else localStorage.removeItem(activeKey());
+  }
   renderHistory();
 }
 function activeChat() { return chats.find(chat => chat.id === activeId) || null; }
@@ -463,7 +467,7 @@ async function loadRemoteChats() {
   } catch(error) { syncFailed=true; updateAccountUI(); console.error('[history]',error); }
 }
 async function enterAccount(data) {
-  const guestChats=readJson('top_chats_guest_v1',[]).filter(chat=>chat && Array.isArray(chat.messages) && chat.messages.length);
+  const guestChats=chats.filter(chat=>chat && Array.isArray(chat.messages) && chat.messages.length);
   session=data.session; user=data.user;
   localStorage.setItem('top_session_v1',JSON.stringify({...session,user}));
   chats=readChats(); activeId=localStorage.getItem(activeKey())||null;
@@ -471,14 +475,14 @@ async function enterAccount(data) {
   const existing=new Set(chats.map(chat=>chat.id));
   const imported=guestChats.filter(chat=>!existing.has(chat.id)).map(chat=>({...chat,remoteId:null}));
   chats.push(...imported);
-  if (imported.length) { persist(); await Promise.all(imported.map(syncChat)); if (!syncFailed) localStorage.removeItem('top_chats_guest_v1'); }
+  if (imported.length) { persist(); await Promise.all(imported.map(syncChat)); }
   if (!activeId && imported.length) activeId=imported[0].id;
   persist(); updateAccountUI(); renderConversation();
 }
 function leaveAccount() {
   session=null; user=null; localStorage.removeItem('top_session_v1');
   clearPendingImage(); for(const url of imageUrls.values()) URL.revokeObjectURL(url); imageUrls.clear();
-  chats=readChats(); activeId=localStorage.getItem(activeKey())||null; syncFailed=false;
+  chats=[]; activeId=null; syncFailed=false;
   closeAuth(); updateAccountUI(); persist(); renderConversation();
 }
 function openAuth() {
@@ -667,6 +671,8 @@ document.addEventListener('keydown',event=>{
   if(event.key==='Tab'&&dialog) { const focusable=[...dialog.querySelectorAll('button:not(:disabled),a[href],input:not([hidden]),textarea')].filter(node=>node.getClientRects().length); const first=focusable[0],last=focusable.at(-1); if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();} }
   if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'&&!dialog){event.preventDefault();openChatSearch();}
 });
+window.addEventListener('pagehide',()=>{ if(!user){ chats=[]; activeId=null; } });
+window.addEventListener('pageshow',event=>{ if(event.persisted&&!user) newChat(); });
 
 setLanguage(lang);
 handleAuthCallback();

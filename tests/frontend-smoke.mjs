@@ -29,7 +29,7 @@ async function assertBottomComposer(page, height) {
   assert.ok(input.y+input.height<height, 'composer remains within the viewport');
 }
 
-test('Top chat keeps context, follow-ups, results and guest history', async () => {
+test('Top chat keeps context and follow-ups during a guest visit', async () => {
   const browser = await chromium.launch({ headless: true, executablePath: browserPath });
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -100,9 +100,6 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     assert.equal(requests[1].history.find(turn => turn.products)?.products[0].title, 'Sony WH-CH720N');
     assert.equal(await page.locator('.card').count(), 2);
     assert.match(await page.locator('#suggestions').innerText(), /Xarid variantlari/);
-    await page.reload();
-    assert.equal(await page.locator('.message.user').count(), 2);
-    assert.equal(await page.locator('.card').count(), 2);
     assert.equal(await page.locator('#historyList .history-item').count(), 1);
     await page.locator('#openSearch').click();
     assert.equal(await page.locator('#searchDialog').isVisible(),true);
@@ -157,6 +154,15 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     assert.equal(requests.at(-1).query, 'Ot uchun egar');
     await page.setViewportSize({width:390,height:844});
     assert.equal(await page.locator('#suggestions').isVisible(),true,'follow-up chips remain visible on small mobile');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('top_chats_guest_v1')),null);
+    await page.reload();
+    assert.equal(await page.locator('#historyList .history-item').count(),0);
+    assert.equal(await page.locator('.message.user').count(),0);
+    assert.equal(await page.locator('#chatHeading').isVisible(),true);
+    await page.evaluate(()=>localStorage.setItem('top_chats_guest_v1',JSON.stringify([{id:'legacy',title:'Old guest chat',messages:[{role:'user',content:'Old request'}],updatedAt:new Date().toISOString()}])));
+    await page.reload();
+    assert.equal(await page.locator('#historyList .history-item').count(),0);
+    assert.equal(await page.evaluate(()=>localStorage.getItem('top_chats_guest_v1')),null);
   } finally { await browser.close(); }
 });
 
@@ -164,17 +170,25 @@ test('mobile opens with its sidebar closed and chat search finds titles and mess
   const browser=await chromium.launch({headless:true,executablePath:browserPath});
   try {
     const page=await browser.newPage({viewport:{width:390,height:844}});
+    await page.route('https://topsiagent.onrender.com/api/search',async route=>{
+      const query=route.request().postDataJSON().query;
+      const reply=query==='Kundalik xarid'?'Ko‘k chamadon top':'Qizil rangdagi variant kerak';
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({type:'clarify',reply,products:[]})});
+    });
     await page.goto(url);
-    await page.evaluate(()=>localStorage.setItem('top_chats_guest_v1',JSON.stringify([
-      {id:'11111111-1111-4111-8111-111111111111',title:'Kundalik xarid',messages:[{role:'user',content:'Ko‘k chamadon top'},{role:'assistant',content:'Qancha budjet ajratasiz?'}],updatedAt:new Date().toISOString()},
-      {id:'22222222-2222-4222-8222-222222222222',title:'Telefon uchun g‘ilof',messages:[{role:'user',content:'Qizil rangdagi variant kerak'},{role:'assistant',content:'Telefon modelingiz qaysi?'}],updatedAt:new Date().toISOString()}
-    ])));
-    await page.reload();
     assert.equal(await page.locator('#rail').evaluate(el=>el.classList.contains('open')),false);
     assert.equal(await page.locator('#mobileMenu').isVisible(),true);
     assert.equal(await page.locator('#suggestions').isVisible(),true);
     assert.equal(await page.locator('#suggestions').evaluate(el=>el.scrollWidth>el.clientWidth),true);
     assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),true);
+    await page.locator('#input').fill('Kundalik xarid');
+    await page.locator('#send').click();
+    await page.locator('#messages').getByText('Ko‘k chamadon top').waitFor();
+    await showRail(page);
+    await page.locator('#railNew').click();
+    await page.locator('#input').fill('Telefon uchun g‘ilof');
+    await page.locator('#send').click();
+    await page.locator('#messages').getByText('Qizil rangdagi variant kerak').waitFor();
     await page.locator('#input').focus();
     await page.keyboard.press('Control+k');
     assert.equal(await page.locator('#searchDialog').isVisible(),true);
@@ -247,25 +261,24 @@ test('an older product result remains available to later follow-ups', async () =
   const browser = await chromium.launch({ headless: true, executablePath: browserPath });
   try {
     const page = await browser.newPage();
-    let request;
+    let request; let searches=0;
     await page.route('https://topsiagent.onrender.com/api/search', async route => {
       request = route.request().postDataJSON();
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ type:'clarify', reply:'Tushundim.', products:[], followUps:[] }) });
+      searches++;
+      const response=searches===1
+        ? {type:'results',reply:'Ikki variant topdim.',products:[{title:'Sport ryukzak',store:'Uzum Market',url:'https://uzum.uz/uz/product/sport-ryukzak'}]}
+        : {type:'clarify',reply:searches===7?'Tushundim.':`Javob ${searches-2}`,products:[],followUps:[]};
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
     });
     await page.goto(url);
-    const messages = [
-      { role:'user', content:'Maktab uchun ryukzak qidir' },
-      { role:'assistant', content:'Ikki variant topdim.', products:[{ title:'Sport ryukzak', store:'Uzum Market', url:'https://uzum.uz/uz/product/sport-ryukzak' }] }
-    ];
-    for (let index=0; index<5; index++) messages.push(
-      { role:'user', content:`Savol ${index}` }, { role:'assistant', content:`Javob ${index}` }
-    );
-    await page.evaluate(value => localStorage.setItem('top_chats_guest_v1',JSON.stringify(value)), [
-      { id:'11111111-1111-4111-8111-111111111111', remoteId:null, title:'Maktab uchun ryukzak', messages, updatedAt:new Date().toISOString() }
-    ]);
-    await page.reload();
-    await showRail(page);
-    await page.locator('#historyList .history-open').click();
+    await page.locator('#input').fill('Maktab uchun ryukzak qidir');
+    await page.locator('#send').click();
+    await page.locator('.card').first().waitFor();
+    for(let index=0;index<5;index++){
+      await page.locator('#input').fill(`Savol ${index}`);
+      await page.locator('#send').click();
+      await page.locator('#messages').getByText(`Javob ${index}`,{exact:true}).waitFor();
+    }
     await page.locator('#input').fill('birinchisi, shuni sotib ol');
     await page.locator('#send').click();
     await page.getByText('Tushundim.').waitFor();
