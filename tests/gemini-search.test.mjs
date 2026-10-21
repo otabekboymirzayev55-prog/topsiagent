@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalRetailUrl, directProductPage, retailerSources, searchWithGemini } from '../gemini-search.js';
+import { canonicalRetailUrl, directProductPage, retailerSources, searchWithGemini, temporaryReply } from '../gemini-search.js';
 import { trustedRetailUrl, verifiedReply, verifyProductLinks } from '../search-agent.js';
 
 const helpers = { trustedRetailUrl, verifiedReply, verifyProductLinks };
@@ -59,6 +59,7 @@ test('search sources drop untrusted URLs and uncertain snippet prices', () => {
   assert.equal(directProductPage('https://www.amazon.com/new-iphone-15/s?k=new+iphone+15'),false);
   assert.equal(directProductPage('https://www.ebay.com/shop/celular-iphone-15?_nkw=celular+iphone+15'),false);
   assert.equal(directProductPage('https://www.amazon.com/dp/B0CHX1W1XY'),true);
+  assert.equal(directProductPage('https://www.amazon.co.uk/dp/B0CHX1W1XY'),true);
   assert.equal(directProductPage('https://uzum.uz/uz/product/suv-otkazmaydigan-ryukzak-1286039?skuId=4103052'),true);
 });
 
@@ -83,24 +84,55 @@ test('a specific request never repeats an unsupported stock claim', async () => 
   assert.doesNotMatch(result.reply,/sotuvda yo‘q/);
 });
 
-test('temporary Gemini failure uses verified retailer pages without invented prices', async () => {
+test('Gemini planning failure does not spend a retailer lookup or recommend products', async () => {
   let modelCalls=0;
+  let searchCalls=0;
   const request=async url => {
     if (String(url).includes('generativelanguage')) { modelCalls++; return {ok:false,status:503}; }
-    if (String(url).includes('serpapi')) {
-      assert.match(String(url),/site%3Auzum\.uz/);
-      return json({organic_results:[
-        {title:'Samsung 55 dyuym televizor',link:'https://uzum.uz/uz/product/samsung-tv-123456',snippet:'Samsung TV'}
-      ]});
-    }
-    return {status:200,headers:new Headers()};
+    if (String(url).includes('serpapi')) searchCalls++;
+    throw new Error('Unexpected retailer request');
   };
   const result=await searchWithGemini('Samsung 55 dyuym televizor kerak',[],new Map(),null,helpers,
     {geminiKey:'test-gemini',serpKey:'test-serp',request});
   assert.equal(modelCalls,2);
-  assert.equal(result.type,'results');
-  assert.equal(result.products[0].price,null);
-  assert.equal(result.products[0].url,'https://uzum.uz/uz/product/samsung-tv-123456');
+  assert.equal(searchCalls,0);
+  assert.equal(result.type,'clarify');
+  assert.equal(result.reason,'provider_unavailable');
+  assert.deepEqual(result.products,[]);
+  assert.equal(result.reply,temporaryReply('Samsung 55 dyuym televizor kerak'));
+});
+
+test('Gemini selection failure never recommends a phone or an over-budget TV', async () => {
+  let modelCalls=0;
+  let searchCalls=0;
+  const request=async url => {
+    if (String(url).includes('generativelanguage')) {
+      modelCalls++;
+      if (modelCalls===1) return model({type:'search',searchQuery:'Samsung 55 TV site:uzum.uz'});
+      return {ok:false,status:503};
+    }
+    if (String(url).includes('serpapi')) {
+      searchCalls++;
+      return json({organic_results:[
+        {title:'Samsung Galaxy A56 telefon',link:'https://uzum.uz/uz/product/samsung-galaxy-a56-123456',extracted_price:6000000,currency:'UZS'},
+        {title:'Samsung 55 dyuym televizor',link:'https://uzum.uz/uz/product/samsung-55-tv-654321',extracted_price:9000000,currency:'UZS'}
+      ]});
+    }
+    throw new Error('Unselected products must not be verified');
+  };
+  const result=await searchWithGemini('Samsung 55 dyuym televizor 5 million somgacha',[],new Map(),null,helpers,
+    {geminiKey:'test-gemini',serpKey:'test-serp',request});
+  assert.equal(modelCalls,3);
+  assert.equal(searchCalls,1);
+  assert.equal(result.type,'clarify');
+  assert.equal(result.reason,'provider_unavailable');
+  assert.deepEqual(result.products,[]);
+});
+
+test('provider outage messages follow the request language', () => {
+  assert.match(temporaryReply('Samsung TV kerak'),/vaqtincha/);
+  assert.match(temporaryReply('Find a Samsung TV'),/temporarily unavailable/);
+  assert.match(temporaryReply('Найди телевизор'),/временно недоступен/);
 });
 
 test('SerpApi empty-results error is treated as no matches', async () => {
