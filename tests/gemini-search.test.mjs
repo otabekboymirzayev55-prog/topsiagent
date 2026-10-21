@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalRetailUrl, retailerSources, searchWithGemini } from '../gemini-search.js';
+import { canonicalRetailUrl, directProductPage, retailerSources, searchWithGemini } from '../gemini-search.js';
 import { trustedRetailUrl, verifiedReply, verifyProductLinks } from '../search-agent.js';
 
 const helpers = { trustedRetailUrl, verifiedReply, verifyProductLinks };
@@ -56,6 +56,10 @@ test('search sources drop untrusted URLs and uncertain snippet prices', () => {
   assert.equal(canonicalRetailUrl('https://uzum.uz/uz/product/qizil-egar/reviews?srsltid=abc'),
     'https://uzum.uz/uz/product/qizil-egar');
   assert.equal(canonicalRetailUrl('https://uzum.uz/uz/category/egar'),null);
+  assert.equal(directProductPage('https://www.amazon.com/new-iphone-15/s?k=new+iphone+15'),false);
+  assert.equal(directProductPage('https://www.ebay.com/shop/celular-iphone-15?_nkw=celular+iphone+15'),false);
+  assert.equal(directProductPage('https://www.amazon.com/dp/B0CHX1W1XY'),true);
+  assert.equal(directProductPage('https://uzum.uz/uz/product/suv-otkazmaydigan-ryukzak-1286039?skuId=4103052'),true);
 });
 
 test('a specific request never repeats an unsupported stock claim', async () => {

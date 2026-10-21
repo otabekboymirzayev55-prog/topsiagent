@@ -73,6 +73,21 @@ function sourceTitle(result, url) {
   return slug ? `${slug.charAt(0).toUpperCase()}${slug.slice(1)}`.slice(0, 200) : supplied.slice(0, 200);
 }
 
+export function directProductPage(value) {
+  const url = new URL(value);
+  const host = url.hostname.toLowerCase();
+  const path = url.pathname.toLowerCase();
+  if (["q", "s", "k", "_nkw", "search", "keyword", "keywords"].some(key => url.searchParams.has(key))) return false;
+  if (/\/(?:search|catalog|category|categories|collections?|shop)(?:\/|$)/.test(path)) return false;
+  if (host === "amazon.com" || host.endsWith(".amazon.com") || /^amazon\.(?:co\.uk|de|fr|in|ca)$/.test(host))
+    return /\/(?:dp|gp\/product)\/[a-z0-9]{6,}/i.test(path);
+  if (host === "ebay.com" || host.endsWith(".ebay.com") || host === "ebay.co.uk" || host.endsWith(".ebay.co.uk"))
+    return /\/itm\/(?:[^/]+\/)?\d{8,}/.test(path);
+  if (host === "walmart.com" || host.endsWith(".walmart.com")) return /\/ip\/[^/]+/.test(path);
+  if (host === "bestbuy.com" || host.endsWith(".bestbuy.com")) return /\/site\/[^/]+\/\d+\.p$/.test(path);
+  return /\/(?:product|products|item|items|ip|p)\/[^/]+/.test(path) || /\/[^/]+\.product\.\d+\.html$/.test(path);
+}
+
 export function retailerSources(data, isRetailUrl) {
   const results = [...(Array.isArray(data?.organic_results) ? data.organic_results : []),
     ...(Array.isArray(data?.shopping_results) ? data.shopping_results : [])];
@@ -81,7 +96,7 @@ export function retailerSources(data, isRetailUrl) {
     const rawUrl = result.link || result.product_link;
     if (typeof rawUrl !== "string" || !isRetailUrl(rawUrl)) return [];
     const url = canonicalRetailUrl(rawUrl);
-    if (!url || seen.has(url)) return [];
+    if (!url || seen.has(url) || !directProductPage(url)) return [];
     const path = new URL(url).pathname.toLowerCase();
     if (path === "/" || /\/(?:search|catalog|category|categories|collections?)\b/.test(path)) return [];
     seen.add(url);
