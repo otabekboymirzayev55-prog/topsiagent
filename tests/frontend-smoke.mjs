@@ -45,8 +45,8 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) });
     });
     await page.goto(url);
-    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
-    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).color), 'rgb(47, 47, 47)');
+    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(247, 247, 248)');
+    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).color), 'rgb(38, 38, 38)');
     assert.match(await page.locator('body').evaluate(el => getComputedStyle(el).fontFamily), /^Arial/);
     assert.equal(await page.locator('#chatHeading').innerText(), 'Bugun nima sotib olamiz?');
     assert.equal(await page.locator('.brand').innerText(), 'Top');
@@ -104,12 +104,16 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     assert.equal(await page.locator('.message.user').count(), 2);
     assert.equal(await page.locator('.card').count(), 2);
     assert.equal(await page.locator('#historyList .history-item').count(), 1);
+    await page.locator('#openSearch').click();
+    assert.equal(await page.locator('#searchDialog').isVisible(),true);
     await page.locator('#historySearch').fill('quloqchin');
-    assert.equal(await page.locator('#historyList .history-item').count(), 1);
+    assert.equal(await page.locator('#searchResults .search-result').count(), 1);
     await page.locator('#historySearch').fill('telefon');
-    assert.equal(await page.locator('#historyList .history-item').count(), 0);
-    assert.equal(await page.locator('.history-empty').innerText(), 'Mos chat topilmadi');
+    assert.equal(await page.locator('#searchResults .search-result').count(), 0);
+    assert.equal(await page.locator('#searchEmpty').innerText(), 'Mos chat topilmadi');
     await page.locator('#historySearch').fill('');
+    assert.equal(await page.locator('#searchEmpty').innerText(), 'Chatlaringizni qidiring');
+    await page.keyboard.press('Escape');
     assert.equal(await page.locator('#historyList .history-item').count(), 1);
     await showRail(page);
     await page.locator('#railNew').click();
@@ -127,7 +131,10 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     assert.equal(await page.locator('#chatHeading').innerText(), 'Bugun nima sotib olamiz?');
     assert.equal(await page.locator('.brand').innerText(), 'Top');
     assert.equal(await page.locator('#suggestions .suggestion').count(), 4);
-    assert.equal(await page.locator('#suggestions').isVisible(),false,'small mobile welcome omits suggestion cards like v0');
+    assert.equal(await page.locator('#suggestions').isVisible(),true,'new v0 mobile welcome shows horizontal suggestion cards');
+    assert.equal(await page.locator('#suggestions').evaluate(el=>el.scrollWidth>el.clientWidth),true);
+    assert.equal(Math.round((await page.locator('.welcome-mark').boundingBox()).width),42);
+    assert.equal(Math.round((await page.locator('#send').boundingBox()).width),38);
     assert.equal(await page.locator('#mobileNew').count(),0);
     await assertBottomComposer(page,844);
     await showRail(page);
@@ -135,9 +142,9 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     await page.locator('#settingsButton').click();
     assert.equal(await page.locator('#settingsDialog').isVisible(),true);
     await page.locator('#themeToggle').click();
-    assert.notEqual(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    assert.notEqual(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(247, 247, 248)');
     await page.locator('#themeToggle').click();
-    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(247, 247, 248)');
     assert.equal(await page.locator('#chatHeading').evaluate(el => getComputedStyle(el).color), 'rgb(47, 47, 47)');
     await page.keyboard.press('Escape');
     await hideRail(page);
@@ -151,6 +158,48 @@ test('Top chat keeps context, follow-ups, results and guest history', async () =
     await page.setViewportSize({width:390,height:844});
     assert.equal(await page.locator('#suggestions').isVisible(),true,'follow-up chips remain visible on small mobile');
   } finally { await browser.close(); }
+});
+
+test('mobile opens with its sidebar closed and chat search finds titles and message content', async () => {
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  try {
+    const page=await browser.newPage({viewport:{width:390,height:844}});
+    await page.goto(url);
+    await page.evaluate(()=>localStorage.setItem('top_chats_guest_v1',JSON.stringify([
+      {id:'11111111-1111-4111-8111-111111111111',title:'Kundalik xarid',messages:[{role:'user',content:'Ko‘k chamadon top'},{role:'assistant',content:'Qancha budjet ajratasiz?'}],updatedAt:new Date().toISOString()},
+      {id:'22222222-2222-4222-8222-222222222222',title:'Telefon uchun g‘ilof',messages:[{role:'user',content:'Qizil rangdagi variant kerak'},{role:'assistant',content:'Telefon modelingiz qaysi?'}],updatedAt:new Date().toISOString()}
+    ])));
+    await page.reload();
+    assert.equal(await page.locator('#rail').evaluate(el=>el.classList.contains('open')),false);
+    assert.equal(await page.locator('#mobileMenu').isVisible(),true);
+    assert.equal(await page.locator('#suggestions').isVisible(),true);
+    assert.equal(await page.locator('#suggestions').evaluate(el=>el.scrollWidth>el.clientWidth),true);
+    assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),true);
+    await page.locator('#input').focus();
+    await page.keyboard.press('Control+k');
+    assert.equal(await page.locator('#searchDialog').isVisible(),true);
+    assert.equal(await page.locator('#historySearch').evaluate(el=>el===document.activeElement),true);
+    await page.locator('#historySearch').fill('chamadon');
+    assert.deepEqual(await page.locator('#searchResults strong').allInnerTexts(),['Kundalik xarid']);
+    assert.equal(await page.locator('#historyList .history-item').count(),2,'search keeps sidebar history intact');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#searchDialog').isVisible(),false);
+    assert.equal(await page.locator('#input').evaluate(el=>el===document.activeElement),true);
+    await page.keyboard.press('Control+k');
+    await page.locator('#historySearch').fill('chamadon');
+    await page.locator('#historySearch').press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await page.locator('#messages').getByText('Ko‘k chamadon top',{exact:true}).waitFor();
+    assert.equal(await page.locator('#searchDialog').isVisible(),false);
+    assert.ok((await page.getByRole('button',{name:'Nusxalash',exact:true}).boundingBox()).width>=32);
+    await showRail(page);
+    await page.locator('#openSearch').click();
+    await page.locator('#historySearch').fill('Telefon');
+    assert.deepEqual(await page.locator('#searchResults strong').allInnerTexts(),['Telefon uchun g‘ilof']);
+    await page.locator('#historySearch').press('Enter');
+    await page.locator('#messages').getByText('Qizil rangdagi variant kerak',{exact:true}).waitFor();
+    assert.equal(await page.locator('#rail').evaluate(el=>el.classList.contains('open')),false);
+  } finally {await browser.close();}
 });
 
 test('send readiness, thinking motion and IME input behave like a chat app', async () => {

@@ -77,6 +77,24 @@ function toggleTopMenu() { const opening=$('topMenu').hidden; $('topMenu').hidde
 function showDialog(id,focusId) { dialogReturnFocus=document.activeElement; $(id).classList.add('open'); if(focusId) $(focusId).focus(); }
 function hideDialog(id) { if(!$(id).classList.contains('open'))return; $(id).classList.remove('open'); if(dialogReturnFocus?.isConnected) dialogReturnFocus.focus(); }
 function openSettings() { closeTopMenu(); showDialog('settingsDialog','themeToggle'); }
+function openChatSearch() { closeTopMenu(); $('historySearch').value=''; renderSearchResults(); showDialog('searchDialog','historySearch'); }
+function searchText(value) { return String(value||'').toLocaleLowerCase('uz').replace(/[’‘`]/g,"'"); }
+function renderSearchResults() {
+  const query=searchText($('historySearch').value.trim());
+  const matches=query?chats.filter(chat=>chat.messages.length && (searchText(chat.title).includes(query)||chat.messages.some(message=>searchText(message.content).includes(query))))
+    .sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt)):[];
+  $('searchResults').replaceChildren();
+  $('searchEmpty').hidden=matches.length>0;
+  $('searchEmpty').textContent=query?'Mos chat topilmadi':'Chatlaringizni qidiring';
+  for(const chat of matches) {
+    const button=document.createElement('button'); button.type='button'; button.className='search-result';
+    const title=document.createElement('strong'); title.textContent=chat.title;
+    const message=chat.messages.find(turn=>searchText(turn.content).includes(query))||chat.messages.at(-1);
+    const snippet=document.createElement('span'); snippet.textContent=String(message?.content||'').replace(/\s+/g,' ').slice(0,160);
+    button.append(title,snippet); button.addEventListener('click',()=>{hideDialog('searchDialog');selectChat(chat.id);$('input').focus();});
+    $('searchResults').append(button);
+  }
+}
 function icon(name) { const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('viewBox','0 0 24 24'); svg.setAttribute('fill','none'); svg.setAttribute('stroke','currentColor'); svg.setAttribute('stroke-width','1.8'); svg.setAttribute('stroke-linecap','round'); svg.setAttribute('stroke-linejoin','round'); svg.setAttribute('aria-hidden','true'); const use=document.createElementNS('http://www.w3.org/2000/svg','use'); use.setAttribute('href',`#icon-${name}`); svg.append(use); return svg; }
 function actionButton(label,iconName,action) { const button=document.createElement('button'); button.type='button'; button.setAttribute('aria-label',label); button.title=label; button.append(icon(iconName)); button.addEventListener('click',action); return button; }
 
@@ -103,7 +121,7 @@ function setLanguage() {
 }
 function updateTheme() {
   document.documentElement.classList.toggle('dark',darkTheme);
-  document.querySelector('meta[name="theme-color"]').content = darkTheme ? '#212121' : '#ffffff';
+  document.querySelector('meta[name="theme-color"]').content = darkTheme ? '#212121' : '#f7f7f8';
   const label = darkTheme ? t('whiteTheme') : t('darkTheme');
   $('themeLabel').textContent=label;
   $('themeToggle').setAttribute('aria-label',label);
@@ -122,12 +140,8 @@ function updateAccountUI() {
 function renderHistory() {
   document.querySelectorAll('body > .history-menu').forEach(node=>node.remove());
   $('historyList').replaceChildren();
-  const query=$('historySearch').value.trim().toLocaleLowerCase('uz');
-  const visible=chats.filter(chat => chat.messages.length && (!query || chat.title.toLocaleLowerCase('uz').includes(query)))
+  const visible=chats.filter(chat => chat.messages.length)
     .sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-  if(query && !visible.length) {
-    const empty=document.createElement('p'); empty.className='history-empty'; empty.textContent='Mos chat topilmadi'; $('historyList').append(empty);
-  }
   visible.forEach(chat => {
     const item=document.createElement('div'); item.className='history-item' + (chat.id===activeId ? ' active' : '');
     const open=document.createElement('button'); open.type='button'; open.className='history-open'; open.textContent=chat.title; open.title=chat.title;
@@ -152,6 +166,7 @@ function renderHistory() {
     });
     wrap.append(more); item.append(open,wrap); $('historyList').append(item);
   });
+  if($('searchDialog').classList.contains('open')) renderSearchResults();
 }
 function selectChat(id) {
   if (loading) { requestController?.abort(); loading=false; }
@@ -582,7 +597,11 @@ async function renderSharedChat() {
 $('send').addEventListener('click',()=>send());
 $('input').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&event.keyCode!==229){event.preventDefault();send();}});
 $('input').addEventListener('input',()=>{ $('input').style.height='auto'; $('input').style.height=Math.min($('input').scrollHeight,120)+'px'; updateSendState(); });
-$('historySearch').addEventListener('input',renderHistory);
+$('openSearch').addEventListener('click',openChatSearch);
+$('closeSearch').addEventListener('click',()=>hideDialog('searchDialog'));
+$('historySearch').addEventListener('input',renderSearchResults);
+$('historySearch').addEventListener('keydown',event=>{const first=$('searchResults').querySelector('button');if(first&&event.key==='ArrowDown'){event.preventDefault();first.focus();}else if(first&&event.key==='Enter'&&!event.isComposing){event.preventDefault();first.click();}});
+$('searchResults').addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp'].includes(event.key))return;const buttons=[...$('searchResults').querySelectorAll('button')];const index=buttons.indexOf(document.activeElement);if(index<0)return;event.preventDefault();const next=buttons[index+(event.key==='ArrowDown'?1:-1)];(next||$('historySearch')).focus();});
 $('newSearch').addEventListener('click',newChat); $('railNew').addEventListener('click',newChat);
 $('mobileMenu').addEventListener('click',openRail); $('railClose').addEventListener('click',closeRail); $('backdrop').addEventListener('click',closeRail);
 $('themeToggle').addEventListener('click',()=>{darkTheme=!darkTheme;localStorage.setItem('top_v0_theme_v1',darkTheme?'dark':'light');updateTheme();});
@@ -613,11 +632,13 @@ document.addEventListener('keydown',event=>{
   const dialog=[...document.querySelectorAll('.dialog.open')].at(-1);
   if(event.key==='Escape') { if(dialog)hideDialog(dialog.id);else{closeTopMenu();document.querySelectorAll('.history-menu').forEach(node=>node.hidden=true);closeRailOnMobile();} }
   if(event.key==='Tab'&&dialog) { const focusable=[...dialog.querySelectorAll('button:not(:disabled),a[href],input:not([hidden]),textarea')].filter(node=>node.getClientRects().length); const first=focusable[0],last=focusable.at(-1); if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();} }
-  if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'&&!dialog){event.preventDefault();openRail();$('historySearch').focus();}
+  if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'&&!dialog){event.preventDefault();openChatSearch();}
 });
 
 setLanguage(lang);
 updateSendState();
+if(matchMedia('(min-width:721px)').matches) openRail(); else closeRail();
+requestAnimationFrame(()=>$('shell').classList.remove('booting'));
 new ResizeObserver(entries=>{ $('workspace').style.setProperty('--composer-space',`${Math.ceil(entries[0].target.getBoundingClientRect().height+42)}px`); }).observe(document.querySelector('.composer'));
 if (shareToken) { renderSharedChat(); setInterval(()=>{if(!document.hidden)renderSharedChat();},15000); }
 else if (user) loadRemoteChats();

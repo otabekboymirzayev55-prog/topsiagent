@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#f7f7f8">
   <meta name="description" content="Top — xarid uchun aqlli suhbat.">
   <title>Top — xarid uchun suhbat</title>
   <link rel="icon" type="image/svg+xml" href="./icon.svg">
@@ -35,12 +35,12 @@
   <symbol id="icon-backpack" viewBox="0 0 24 24"><rect x="5" y="6" width="14" height="16" rx="3"/><path d="M9 6V4a3 3 0 0 1 6 0v2M8 14h8v5H8ZM3 11v7M21 11v7"/></symbol>
 </defs></svg>
 <template id="starTemplate"><svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true"><polygon fill="#fff" points="12,1.5 15.09,8.26 22.5,9.13 17.02,14.2 18.49,21.5 12,17.87 5.51,21.5 6.98,14.2 1.5,9.13 8.91,8.26"/></svg></template>
-<div class="shell" id="shell">
-  <aside class="rail open" id="rail" aria-label="Chat tarixi">
+<div class="shell sidebar-closed booting" id="shell">
+  <aside class="rail" id="rail" aria-label="Chat tarixi">
     <div class="sidebar-top">
       <button class="icon-button sidebar-toggle" id="railClose" type="button" aria-label="Panelni yopish"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><use href="#icon-x"/></svg></button>
       <button class="rail-new" id="railNew" type="button"><span class="brand-mark"><svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true"><polygon fill="#fff" points="12,1.5 15.09,8.26 22.5,9.13 17.02,14.2 18.49,21.5 12,17.87 5.51,21.5 6.98,14.2 1.5,9.13 8.91,8.26"/></svg></span><span id="railNewText">Yangi chat</span><svg class="new-chat-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><use href="#icon-plus"/></svg></button>
-      <label class="rail-search" for="historySearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><use href="#icon-search"/></svg><input id="historySearch" type="search" placeholder="Chatlarni qidirish" autocomplete="off" aria-label="Chatlarni qidirish"><kbd>⌘ K</kbd></label>
+      <button class="rail-search" id="openSearch" type="button" aria-label="Chatlarni qidirish" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><use href="#icon-search"/></svg><span class="rail-search-label">Chatlarni qidirish</span><kbd>⌘ K</kbd></button>
     </div>
     <div class="history-label" id="historyLabel">Chat tarixi</div>
     <nav class="history-list" id="historyList" aria-label="Saqlangan chatlar"></nav>
@@ -50,10 +50,10 @@
       <button class="settings-row" id="settingsButton" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><use href="#icon-settings"/></svg><span>Sozlamalar</span></button>
     </div>
   </aside>
-  <div class="backdrop open" id="backdrop"></div>
+  <div class="backdrop" id="backdrop"></div>
   <div class="app">
     <header class="topbar">
-      <button class="icon-button mobile-menu" id="mobileMenu" type="button" aria-label="Panelni ochish" aria-expanded="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><use href="#icon-menu"/></svg></button>
+      <button class="icon-button mobile-menu" id="mobileMenu" type="button" aria-label="Panelni ochish" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><use href="#icon-menu"/></svg></button>
       <button class="brand model-picker" id="brandButton" type="button" aria-label="Top menyusi" aria-expanded="false">Top<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><use href="#icon-chevron"/></svg></button>
       <button class="icon-button top-more" id="topMore" type="button" aria-label="Chat amallari" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#icon-more"/></svg></button>
       <div class="top-menu" id="topMenu" hidden><button id="newSearch" type="button">Yangi chat</button><button id="shareCurrent" type="button" disabled>Chatni ulashish</button><button id="settingsTop" type="button">Sozlamalar</button></div>
@@ -88,6 +88,7 @@
     </main>
   </div>
 </div>
+<div class="dialog search-overlay" id="searchDialog" role="dialog" aria-modal="true" aria-label="Chatlarni qidirish"><div class="dialog-box search-dialog"><div class="search-dialog-header"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><use href="#icon-search"/></svg><input id="historySearch" type="search" placeholder="Chatlarni qidirish" autocomplete="off" aria-label="Chatlarni qidirish"><button class="icon-button" id="closeSearch" type="button" aria-label="Qidiruvni yopish"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><use href="#icon-x"/></svg></button></div><p class="search-empty" id="searchEmpty" role="status">Chatlaringizni qidiring</p><div class="search-results" id="searchResults"></div><p class="search-hint"><kbd>Esc</kbd><span>yopish uchun</span></p></div></div>
 <div class="dialog" id="settingsDialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="dialog-box action-box"><div class="dialog-head"><h2 id="settingsTitle">Sozlamalar</h2><button class="close" id="closeSettings" type="button" aria-label="Yopish">×</button></div><button class="settings-theme" id="themeToggle" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><use href="#icon-moon"/></svg>Mavzu<span id="themeLabel">Qora rejim</span></button><p id="historyFoot" style="margin-top:18px"></p></div></div>
 
 <div class="dialog" id="compareDialog" role="dialog" aria-modal="true" aria-labelledby="compareTitle"><div class="dialog-box"><div class="dialog-head"><h2 id="compareTitle">Mahsulotlarni solishtirish</h2><button class="close" id="closeDialog" type="button" aria-label="Yopish">×</button></div><div class="table-scroll" id="compareTable"></div></div></div>
