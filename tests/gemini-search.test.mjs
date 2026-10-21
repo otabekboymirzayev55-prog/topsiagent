@@ -98,3 +98,19 @@ test('temporary Gemini failure uses verified retailer pages without invented pri
   assert.equal(result.products[0].price,null);
   assert.equal(result.products[0].url,'https://uzum.uz/uz/product/samsung-tv-123456');
 });
+
+test('SerpApi empty-results error is treated as no matches', async () => {
+  let searchCalls=0;
+  const request=async url => {
+    if (String(url).includes('generativelanguage')) return model({type:'search',searchQuery:'rare product site:olcha.uz'});
+    if (String(url).includes('serpapi')) {
+      searchCalls++;
+      return json({search_metadata:{status:'Success'},error:"Google hasn't returned any results for this query."});
+    }
+    throw new Error('Unexpected request');
+  };
+  const result=await searchWithGemini('rare product in Uzbekistan',[],new Map(),null,helpers,
+    {geminiKey:'test-gemini',serpKey:'test-serp',request});
+  assert.equal(searchCalls,2);
+  assert.equal(result.type,'clarify');
+});
