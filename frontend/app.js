@@ -482,7 +482,7 @@ function leaveAccount() {
   closeAuth(); updateAccountUI(); persist(); renderConversation();
 }
 function openAuth() {
-  authMode='login'; $('authError').hidden=true; $('authStatus').hidden=true; $('resendConfirmation').hidden=true; $('authEmail').value=''; $('authPassword').value='';
+  authMode='login'; $('authError').hidden=true; $('authStatus').hidden=true; $('resendConfirmation').hidden=!!user; $('authEmail').value=''; $('authPassword').value='';
   setLanguage(lang); showDialog('authDialog',user?'signOut':'authEmail');
 }
 function closeAuth() { hideDialog('authDialog'); }
@@ -645,7 +645,7 @@ $('compareAction').addEventListener('click',showCompare); $('closeDialog').addEv
 $('closePurchase').addEventListener('click',closePurchaseOptions);
 $('accountButton').addEventListener('click',openAuth); $('closeAuth').addEventListener('click',closeAuth);
 $('authForm').addEventListener('submit',submitAuth);
-$('authSwitch').addEventListener('click',()=>{authMode=authMode==='login'?'signup':'login';$('authError').hidden=true;$('authStatus').hidden=true;$('resendConfirmation').hidden=true;setLanguage(lang);});
+$('authSwitch').addEventListener('click',()=>{authMode=authMode==='login'?'signup':'login';$('authError').hidden=true;$('authStatus').hidden=true;$('resendConfirmation').hidden=authMode!=='login';setLanguage(lang);});
 $('resendConfirmation').addEventListener('click',resendConfirmation);
 $('signOut').addEventListener('click',leaveAccount);
 function attachImage() { if(user) $('imageFile').click(); else openAuth(); }

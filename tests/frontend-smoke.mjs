@@ -302,6 +302,7 @@ test('sign-in moves guest chats to the account and loads them on return', async 
     await page.getByText('Qancha budjet ajratasiz?').waitFor();
     await showRail(page);
     await page.locator('#accountButton').click();
+    assert.equal(await page.locator('#resendConfirmation').isVisible(),true);
     await page.locator('#authEmail').fill('test@example.com'); await page.locator('#authPassword').fill('password123');
     await page.locator('#authSubmit').click();
     await page.waitForFunction(()=>document.querySelector('#historyFoot').textContent.includes('hisobingizda'));
