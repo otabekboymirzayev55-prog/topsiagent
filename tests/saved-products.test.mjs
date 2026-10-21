@@ -145,11 +145,12 @@ test('unreadable prices keep the old amount and never newly enable tracking',asy
   assert.equal(db.rpcCalls.length,0);
 });
 
-test('automatic worker is opt-in and all account routes use authentication',async()=>{
-  assert.equal(priceWatchCapabilities({}).automaticEnabled,false);
+test('automatic worker can be disabled and all account routes use authentication',async()=>{
+  assert.equal(priceWatchCapabilities({}).automaticEnabled,true);
   assert.equal(priceWatchCapabilities({PRICE_WATCH_ENABLED:'true'}).automaticEnabled,true);
+  assert.equal(priceWatchCapabilities({PRICE_WATCH_ENABLED:'false'}).automaticEnabled,false);
   assert.equal(priceWatchCapabilities({PRICE_WATCH_INTERVAL_MS:'1'}).intervalHours,6);
-  const service=createSavedProductsService({db:new MemoryDB([row({tracking_enabled:false})]),env:{}});
+  const service=createSavedProductsService({db:new MemoryDB([row({tracking_enabled:false})]),env:{PRICE_WATCH_ENABLED:'false'}});
   await assert.rejects(service.setTracking(owner,id,true),error=>error.status===503&&error.code==='AUTOMATIC_TRACKING_NOT_CONFIGURED');
   const routes=[]; const app=Object.fromEntries(['get','post','patch','delete'].map(method=>[method,(path,...handlers)=>routes.push({path,handlers})]));
   const auth=()=>{};

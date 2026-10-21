@@ -11,7 +11,7 @@ const fail = (status, code, message, extra = {}) => Object.assign(new Error(mess
 export function priceWatchCapabilities(env = process.env) {
   const configured = Number(env.PRICE_WATCH_INTERVAL_MS);
   const intervalMs = Number.isFinite(configured) && configured >= hour && configured <= 24 * hour ? configured : 6 * hour;
-  return { automaticEnabled: env.PRICE_WATCH_ENABLED === "true", intervalHours: intervalMs / hour, manualCheck: true };
+  return { automaticEnabled: env.PRICE_WATCH_ENABLED !== "false", intervalHours: intervalMs / hour, manualCheck: true };
 }
 
 export function savedProductUrl(value) {
