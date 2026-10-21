@@ -7,6 +7,41 @@ const helpers = { trustedRetailUrl, verifiedReply, verifyProductLinks };
 const json = value => ({ ok:true, json:async () => value });
 const model = value => json({ candidates:[{ content:{ parts:[{ text:JSON.stringify(value) }] } }] });
 
+test('Gemini diagnostics report status and timing without logging secrets or user content', async () => {
+  const entries=[];
+  const secret='private-api-key';
+  const query='private shopping request';
+  const request=async (_url, options) => {
+    const config=JSON.parse(options.body).generationConfig;
+    assert.equal(config.thinkingConfig.thinkingLevel,'MINIMAL');
+    assert.equal(config.temperature,undefined);
+    assert.equal(options.signal.aborted,false);
+    return {ok:false,status:403,json:async()=>({error:{status:'PERMISSION_DENIED',message:secret+query}})};
+  };
+  const result=await searchWithGemini(query,[],new Map(),null,helpers,
+    {geminiKey:secret,serpKey:'private-serp',request,logger:entry=>entries.push(entry)});
+  assert.equal(result.reason,'provider_unavailable');
+  assert.equal(entries.length,1);
+  assert.equal(entries[0].stage,'plan');
+  assert.equal(entries[0].httpStatus,403);
+  assert.equal(entries[0].apiStatus,'PERMISSION_DENIED');
+  assert.equal(entries[0].timeoutMs,30000);
+  assert.ok(entries[0].durationMs>=0);
+  assert.doesNotMatch(JSON.stringify(entries),/private/);
+});
+
+test('Gemini timeout is logged once and does not trigger retailer search', async () => {
+  const entries=[];
+  let calls=0;
+  const request=async()=>{ calls++; throw new DOMException('private network details','TimeoutError'); };
+  const result=await searchWithGemini('Samsung TV kerak',[],new Map(),null,helpers,
+    {geminiKey:'test',serpKey:'test',request,logger:entry=>entries.push(entry)});
+  assert.equal(calls,1);
+  assert.equal(result.reason,'provider_unavailable');
+  assert.equal(entries[0].reason,'timeout');
+  assert.doesNotMatch(JSON.stringify(entries),/private/);
+});
+
 test('Gemini can clarify without a paid retailer lookup', async () => {
   const calls=[];
   const request=async (url, options) => { calls.push({url:String(url), body:JSON.parse(options.body)}); return model({type:'clarify',reply:'Qaysi mahsulot kerak?',followUps:['Ryukzak']}); };

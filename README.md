@@ -23,6 +23,8 @@ TopAgent is a conversational product finder. The responsive web interface asks f
 
 ## Gemini search pilot
 
+Gemini requests use minimal thinking on Gemini 3.x and a 30-second timeout per attempt. `GEMINI_TIMEOUT_MS` may set 5000–60000 ms. Structured `gemini_request` server logs record model, plan/select stage, attempt, duration, HTTP/API status and response failures. They exclude API keys, prompts, images and raw provider error messages. A provider outage returns `provider_unavailable` without product recommendations.
+
 Leave `SEARCH_PROVIDER` unset for the current Claude path. For the pilot, set `SEARCH_PROVIDER=gemini`, `GEMINI_API_KEY` and `SERPAPI_API_KEY` on the backend only. Gemini 3.5 Flash-Lite interprets the conversation and attached image; SerpApi retrieves retailer pages. `GEMINI_MODEL` can override the default after evaluation. Gemini selects source IDs, while the server supplies actual URLs and only structured source prices. Missing or unverifiable links become a clarification instead of a fabricated product card.
 
 `node scripts/evaluate-search.mjs` runs 25 public shopping questions against `TOP_API_URL` (defaults to the Render API) and prints compact results. Review relevance, language and product links manually. It cannot compare live Claude quality while Anthropic credits are exhausted. Free-tier Gemini requests may be used by Google to improve its services, so use only nonsensitive test prompts until a paid Google project is configured.
