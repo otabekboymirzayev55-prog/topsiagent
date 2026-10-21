@@ -7,6 +7,7 @@ import {
 } from "./auth.js";
 import { supabase, createAuthClient } from "./supabase.js";
 import { registerChatFeatureRoutes, validImageId, imageContentForSearch, validateChatImageRefs, deleteChatWithImages } from "./chat-features.js";
+import { registerSavedProductRoutes, startPriceWatchWorker } from "./saved-products.js";
 
 const app = express();
 app.use(cors());
@@ -128,6 +129,8 @@ app.delete("/api/chats/:id", requireAuth, async (req, res) => {
 });
 
 registerChatFeatureRoutes(app);
+const savedProducts = registerSavedProductRoutes(app, { db: supabase, requireAuth });
+startPriceWatchWorker(savedProducts);
 
 // ── Profile: save ────────────────────────────────────────────────────────────
 app.post("/api/profile", requireAuth, async (req, res) => {

@@ -31,6 +31,12 @@ Leave `SEARCH_PROVIDER` unset for the current Claude path. For the pilot, set `S
 
 The frontend points at the production Render API through its `BACKEND` constant. To use a local API, change that value locally before testing.
 
+## Saved products and price alerts
+
+Apply `supabase-saved-products.sql` in Supabase SQL Editor before using the signed-in saved-product endpoints. Saves are owner-scoped and deduplicated by canonical retailer URL (up to 100 per account). Client-provided prices never establish a watch baseline. Price checks accept supported direct product pages and use only unambiguous Product JSON-LD offers or explicit product-price meta data; JavaScript-only, blocked or variant-ambiguous store pages show price unavailable. There is no LLM price inference.
+
+Automatic checks are **off by default**. Set `PRICE_WATCH_ENABLED=true` to run the bounded in-process worker, optionally `PRICE_WATCH_INTERVAL_MS` from 3600000 to 86400000 (default six hours). It checks up to ten due saved products per five-minute batch, one at a time, with persisted check times and leases. A sleeping or stopped Render instance cannot run checks: this is a best-effort schedule, and reliable checks while the app sleeps require an always-on worker or external scheduler. The capabilities endpoint reports whether automatic mode is enabled; the UI must distinguish it from manual checks. Manual checks have a five-minute per-product cooldown. Same-currency verified price drops create private in-app notifications atomically with the price update; no email is sent. Deleting a saved product removes its notifications.
+
 ## Purchase options
 
 Each product offers **Top orqali xarid** and **Do‘konda xarid qilish**. The Top option is visibly unavailable until Uzum Market grants a buyer-order integration and the server can verify a current total, delivery terms, payment authorization, and a confirmed retailer order. `GET /api/checkout/options` reports this state; `POST /api/checkout` returns `503` and never charges a card. The old browser checkout agent, which passed raw card data and CVV into an AI prompt and could report a fabricated order ID, has been removed. `POST /api/profile` rejects card data. Never send card numbers or CVV to this API or a model. Use a payment provider's tokenized flow after the retailer order integration exists.
