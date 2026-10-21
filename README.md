@@ -6,7 +6,7 @@ TopAgent is a conversational product finder. The responsive web interface asks f
 
 - `frontend/index.html`: static, responsive interface deployed to Vercel
 - `index.js`: Express API deployed to Render at `https://topsiagent.onrender.com`
-- `search-agent.js`: Anthropic Claude with web search for product discovery
+- `search-agent.js`: Anthropic Claude with web search by default; optional Gemini + SerpApi pilot in `gemini-search.js`
 - `auth.js`, `supabase-chats.sql`: account sessions, saved chats, private image storage and 24-hour share links
 - Guest chats stay in the current page only. Signing in saves that visit's chats to the account; leaving or reloading the page clears guest history, including browser-stored guest chats from older releases.
 - Purchase options show both Top and retailer paths. Retailer links work now; Top automatic checkout remains unavailable until an authorized buyer-order integration is connected.
@@ -20,6 +20,12 @@ TopAgent is a conversational product finder. The responsive web interface asks f
 4. Run `npm start` for the API.
 5. Open `frontend/index.html` in a browser or serve `frontend/` with a static server.
 6. Run `npm test` for the search and interface smoke tests. The browser test uses installed Chrome on Windows; set `TOPAGENT_BROWSER_PATH` to another Chrome or Chromium executable when needed.
+
+## Gemini search pilot
+
+Leave `SEARCH_PROVIDER` unset for the current Claude path. For the pilot, set `SEARCH_PROVIDER=gemini`, `GEMINI_API_KEY` and `SERPAPI_API_KEY` on the backend only. Gemini 3.1 Flash-Lite interprets the conversation and attached image; SerpApi retrieves retailer pages. Gemini selects source IDs, while the server supplies actual URLs and only structured source prices. Missing or unverifiable links become a clarification instead of a fabricated product card.
+
+`node scripts/evaluate-search.mjs` runs 25 public shopping questions against `TOP_API_URL` (defaults to the Render API) and prints compact results. Review relevance, language and product links manually. It cannot compare live Claude quality while Anthropic credits are exhausted. Free-tier Gemini requests may be used by Google to improve its services, so use only nonsensitive test prompts until a paid Google project is configured.
 
 The frontend points at the production Render API through its `BACKEND` constant. To use a local API, change that value locally before testing.
 

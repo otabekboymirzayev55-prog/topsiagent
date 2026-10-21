@@ -17,7 +17,8 @@ if (appUrl.protocol !== "https:" && !(appUrl.protocol === "http:" && appUrl.host
 const emailRedirectTo = `${appUrl.origin}/`;
 
 // ── Health ───────────────────────────────────────────────────────────────────
-app.get("/health", (_, res) => res.json({ status: "ok", revision: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || null }));
+app.get("/health", (_, res) => res.json({ status: "ok", revision: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || null,
+  searchProvider: process.env.SEARCH_PROVIDER === "gemini" ? "gemini" : "anthropic" }));
 
 // ── Auth: Sign up ────────────────────────────────────────────────────────────
 app.post("/api/auth/signup", async (req, res) => {

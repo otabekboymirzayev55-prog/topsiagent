@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { searchWithGemini } from "./gemini-search.js";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const model = "claude-sonnet-4-6";
@@ -201,6 +202,9 @@ export async function searchAgent(query, history = [], images = new Map(), image
   if (exclusionReply) return { type: "clarify", reply: exclusionReply, products: [] };
   const selection = !imageId && resolveProductFollowUp(query, history);
   if (selection) return selection;
+  if (process.env.SEARCH_PROVIDER === "gemini")
+    return searchWithGemini(expandNoPreference(query, history), history, images, imageId,
+      { trustedRetailUrl, verifiedReply, verifyProductLinks });
   const messages = [
     ...history.slice(-12).filter(turn => turn && ["user", "assistant"].includes(turn.role) && typeof turn.content === "string")
       .map(turn => ({ role: turn.role, content: turn.role === "user"
