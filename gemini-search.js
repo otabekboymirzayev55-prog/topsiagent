@@ -1,6 +1,6 @@
 // Alternative shopping provider. Search results stay on the server only; the
 // model can select source IDs, but cannot create retailer URLs or prices.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const SERP_ENDPOINT = "https://serpapi.com/search.json";
 
