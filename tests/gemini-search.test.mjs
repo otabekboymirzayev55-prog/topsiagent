@@ -57,3 +57,23 @@ test('search sources drop untrusted URLs and uncertain snippet prices', () => {
     'https://uzum.uz/uz/product/qizil-egar');
   assert.equal(canonicalRetailUrl('https://uzum.uz/uz/category/egar'),null);
 });
+
+test('a specific request uses one model call and never repeats an unsupported stock claim', async () => {
+  let modelCalls=0;
+  const request=async url => {
+    if (String(url).includes('serpapi')) return json({organic_results:[
+      {title:'https://olcha.uz/uz/product/redmi-note-14',link:'https://olcha.uz/uz/product/redmi-note-14',snippet:'Redmi Note 14 telefon'}
+    ]});
+    if (String(url).includes('generativelanguage')) {
+      modelCalls++;
+      return model({reply:'Bu mahsulot sotuvda yo‘q.',products:[{sourceId:1,why:'Redmi Note 14 telefon'}]});
+    }
+    return {status:200,headers:new Headers()};
+  };
+  const result=await searchWithGemini('O‘zbekistonda Redmi Note 14 telefonini top',[],new Map(),null,helpers,
+    {geminiKey:'test-gemini',serpKey:'test-serp',request});
+  assert.equal(modelCalls,1);
+  assert.equal(result.type,'results');
+  assert.equal(result.products[0].title,'Redmi note 14');
+  assert.doesNotMatch(result.reply,/sotuvda yo‘q/);
+});

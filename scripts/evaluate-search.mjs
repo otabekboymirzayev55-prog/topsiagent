@@ -28,9 +28,10 @@ const queries = [
   "asaxiy.uz saytidan 1TB SSD qidir",
   "oshxona uchun blender, qizil rangda"
 ];
+const limit = Math.min(queries.length, Math.max(1, Number.parseInt(process.env.TOP_EVAL_LIMIT || "25", 10) || 25));
 
 let successes = 0;
-for (const [index, query] of queries.entries()) {
+async function check([index, query]) {
   const start = Date.now();
   try {
     const response = await fetch(new URL("api/search", api), {
@@ -39,13 +40,17 @@ for (const [index, query] of queries.entries()) {
     });
     const result = await response.json();
     if (response.ok) successes++;
-    console.log(JSON.stringify({ number:index + 1, query, status:response.status,
+    return { number:index + 1, query, status:response.status,
       ms:Date.now() - start, type:result.type, reply:result.reply,
       products:(result.products || []).map(p => ({title:p.title,price:p.price,currency:p.currency,url:p.url})),
-      error:result.error }));
+      error:result.error };
   } catch (error) {
-    console.log(JSON.stringify({ number:index + 1, query, ms:Date.now() - start, error:error.message }));
+    return { number:index + 1, query, ms:Date.now() - start, error:error.message };
   }
 }
-console.log(JSON.stringify({ successes, total:queries.length,
+for (const [index, query] of queries.slice(0, limit).entries()) {
+  console.log(JSON.stringify(await check([index, query])));
+  if (index < limit - 1) await new Promise(resolve => setTimeout(resolve, 1500));
+}
+console.log(JSON.stringify({ successes, total:limit,
   note:"Review relevance, language, retailer links and constraint handling manually." }));
