@@ -78,3 +78,23 @@ test('a specific request never repeats an unsupported stock claim', async () => 
   assert.equal(result.products[0].title,'Redmi note 14');
   assert.doesNotMatch(result.reply,/sotuvda yo‘q/);
 });
+
+test('temporary Gemini failure uses verified retailer pages without invented prices', async () => {
+  let modelCalls=0;
+  const request=async url => {
+    if (String(url).includes('generativelanguage')) { modelCalls++; return {ok:false,status:503}; }
+    if (String(url).includes('serpapi')) {
+      assert.match(String(url),/site%3Auzum\.uz/);
+      return json({organic_results:[
+        {title:'Samsung 55 dyuym televizor',link:'https://uzum.uz/uz/product/samsung-tv-123456',snippet:'Samsung TV'}
+      ]});
+    }
+    return {status:200,headers:new Headers()};
+  };
+  const result=await searchWithGemini('Samsung 55 dyuym televizor kerak',[],new Map(),null,helpers,
+    {geminiKey:'test-gemini',serpKey:'test-serp',request});
+  assert.equal(modelCalls,2);
+  assert.equal(result.type,'results');
+  assert.equal(result.products[0].price,null);
+  assert.equal(result.products[0].url,'https://uzum.uz/uz/product/samsung-tv-123456');
+});
