@@ -14,6 +14,7 @@ TopAgent is a conversational product finder. The responsive web interface asks f
 
 1. Run `npm install`.
 2. Set `ANTHROPIC_API_KEY`, `SUPABASE_URL`, and `SUPABASE_SERVICE_KEY` in your local environment. Set `PUBLIC_APP_URL` to the frontend's public origin. Keep keys on the server only.
+   In Supabase **Authentication → URL Configuration**, set **Site URL** to `https://topagent-frontend.vercel.app/` and add that exact URL under **Redirect URLs**. The signup and resend endpoints use `PUBLIC_APP_URL` as the email confirmation return URL. Old confirmation links cannot be repaired; send a fresh one from the sign-in dialog after correcting these settings.
 3. Run `supabase-chats.sql` in the project's Supabase SQL Editor. It creates the account chat tables, private `chat-images` bucket, share records, and image cleanup queue.
 4. Run `npm start` for the API.
 5. Open `frontend/index.html` in a browser or serve `frontend/` with a static server.

@@ -7,7 +7,7 @@ localStorage.removeItem('topagent_profile');
 const copy = {
   uz: {
     heading:'Bugun nima sotib olamiz?', new:'Yangi chat', history:'Chat tarixi', guest:'Mehmon tarixi shu brauzerda saqlanadi.', synced:'Chatlar hisobingizda saqlanadi.', syncError:'Sinxronlashmadi. Chat shu brauzerda saqlangan.',
-    signIn:'Kirish', signOut:'Chiqish', signUp:'Hisob ochish', haveAccount:'Hisobingiz bormi? Kirish', createAccount:'Hisob ochish', authIntro:'Hisobga kirsangiz, chatlaringiz keyingi safar ham saqlanadi.', confirmEmail:'Emailingizga kelgan tasdiqlash havolasini oching, so‘ng kiring.',
+    signIn:'Kirish', signOut:'Chiqish', signUp:'Hisob ochish', haveAccount:'Hisobingiz bormi? Kirish', createAccount:'Hisob ochish', authIntro:'Hisobga kirsangiz, chatlaringiz keyingi safar ham saqlanadi.', confirmEmail:'Emailingizga kelgan tasdiqlash havolasini oching, so‘ng kiring.', expiredEmail:'Tasdiqlash havolasi eskirgan yoki ishlatilgan. Yangi havola yuboring.', confirmedEmail:'Email tasdiqlandi. Endi hisobga kiring.', resendEmail:'Havolani qayta yuborish', resendSent:'Yangi havola yuborildi. Eng so‘nggi xatni oching.',
     placeholder:'Top’ga yozing', examples:['Ot uchun egar','Nike sneakers','Samsung TV','Maktab uchun ryukzak'], searching:'Qidiryapman', error:'Qidiruvda xatolik yuz berdi. Qayta urinib ko‘ring.',
     results:'Tavsiyalar', count:n=>`${n} ta variant`, note:'Narx va mavjudlikni do‘kon sahifasida tekshiring.', open:'Do‘konda xarid qilish ↗', buy:'Xarid variantlari', autoBuy:'Top orqali xarid', autoUnavailable:'Top orqali avtomatik xarid hozircha mavjud emas. Uzum Market bilan buyurtma integratsiyasi tayyor bo‘lgach ishlaydi.', autoOther:'Top bu do‘kon orqali avtomatik xaridni hali qo‘llamaydi. Do‘konda o‘zingiz xarid qilishingiz mumkin.', more:'Boshqa tavsiyalarni ko‘rsat', cheaper:'Arzonrog‘i bormi?',
     compare:'Solishtirish', selected:n=>`${n} ta tanlandi`, compareTitle:'Mahsulotlarni solishtirish', priceUnknown:'Narx ko‘rsatilmagan', store:'Do‘kon', price:'Narx', fit:'Nima uchun mos', product:'Mahsulot', link:'Havola',
@@ -117,6 +117,7 @@ function setLanguage() {
   $('authTitle').textContent = authMode === 'login' ? t('signIn') : t('signUp');
   $('authSubmit').textContent = $('authTitle').textContent;
   $('authSwitch').textContent = authMode === 'login' ? t('createAccount') : t('haveAccount');
+  $('resendConfirmation').textContent = t('resendEmail');
   updateTheme(); updateAccountUI(); renderHistory(); renderConversation();
 }
 function updateTheme() {
@@ -481,16 +482,47 @@ function leaveAccount() {
   closeAuth(); updateAccountUI(); persist(); renderConversation();
 }
 function openAuth() {
-  authMode='login'; $('authError').hidden=true; $('authStatus').hidden=true; $('authEmail').value=''; $('authPassword').value='';
+  authMode='login'; $('authError').hidden=true; $('authStatus').hidden=true; $('resendConfirmation').hidden=true; $('authEmail').value=''; $('authPassword').value='';
   setLanguage(lang); showDialog('authDialog',user?'signOut':'authEmail');
 }
 function closeAuth() { hideDialog('authDialog'); }
+function handleAuthCallback() {
+  if (!location.hash) return;
+  const params=new URLSearchParams(location.hash.slice(1));
+  const expired=params.get('error_code')==='otp_expired';
+  const confirmed=params.has('access_token') && params.has('refresh_token');
+  if (!expired && !confirmed) return;
+  history.replaceState(null,'',location.pathname+location.search);
+  if (user) return;
+  openAuth();
+  $('authEmail').value=sessionStorage.getItem('top_pending_confirmation_email')||'';
+  if (expired) {
+    $('authError').textContent=t('expiredEmail'); $('authError').hidden=false;
+    $('resendConfirmation').hidden=false;
+  } else {
+    $('authStatus').textContent=t('confirmedEmail'); $('authStatus').hidden=false;
+    sessionStorage.removeItem('top_pending_confirmation_email');
+  }
+}
+async function resendConfirmation() {
+  const email=$('authEmail');
+  if (!email.reportValidity()) return;
+  const button=$('resendConfirmation'); button.disabled=true;
+  $('authError').hidden=true; $('authStatus').hidden=true;
+  try {
+    await api('/api/auth/resend-confirmation',{method:'POST',body:JSON.stringify({email:email.value.trim()})});
+    sessionStorage.setItem('top_pending_confirmation_email',email.value.trim());
+    $('authStatus').textContent=t('resendSent'); $('authStatus').hidden=false;
+  } catch(error) { $('authError').textContent=error.message||t('authFail'); $('authError').hidden=false; }
+  finally { button.disabled=false; }
+}
 async function submitAuth(event) {
   event.preventDefault(); $('authError').hidden=true; $('authStatus').hidden=true; $('authSubmit').disabled=true;
   try {
     const path=authMode==='login'?'/api/auth/login':'/api/auth/signup';
     const data=await api(path,{method:'POST',body:JSON.stringify({email:$('authEmail').value.trim(),password:$('authPassword').value})});
-    if (!data.session) { $('authStatus').textContent=t('confirmEmail'); $('authStatus').hidden=false; return; }
+    if (!data.session) { sessionStorage.setItem('top_pending_confirmation_email',$('authEmail').value.trim()); $('authStatus').textContent=t('confirmEmail'); $('authStatus').hidden=false; $('resendConfirmation').hidden=false; return; }
+    sessionStorage.removeItem('top_pending_confirmation_email');
     await enterAccount(data); closeAuth();
   } catch(error) { $('authError').textContent=error.message||t('authFail'); $('authError').hidden=false; }
   finally { $('authSubmit').disabled=false; }
@@ -613,7 +645,8 @@ $('compareAction').addEventListener('click',showCompare); $('closeDialog').addEv
 $('closePurchase').addEventListener('click',closePurchaseOptions);
 $('accountButton').addEventListener('click',openAuth); $('closeAuth').addEventListener('click',closeAuth);
 $('authForm').addEventListener('submit',submitAuth);
-$('authSwitch').addEventListener('click',()=>{authMode=authMode==='login'?'signup':'login';$('authError').hidden=true;$('authStatus').hidden=true;setLanguage(lang);});
+$('authSwitch').addEventListener('click',()=>{authMode=authMode==='login'?'signup':'login';$('authError').hidden=true;$('authStatus').hidden=true;$('resendConfirmation').hidden=true;setLanguage(lang);});
+$('resendConfirmation').addEventListener('click',resendConfirmation);
 $('signOut').addEventListener('click',leaveAccount);
 function attachImage() { if(user) $('imageFile').click(); else openAuth(); }
 $('attach').addEventListener('click',attachImage); $('imageShortcut').addEventListener('click',attachImage);
@@ -636,6 +669,7 @@ document.addEventListener('keydown',event=>{
 });
 
 setLanguage(lang);
+handleAuthCallback();
 updateSendState();
 if(matchMedia('(min-width:721px)').matches) openRail(); else closeRail();
 requestAnimationFrame(()=>$('shell').classList.remove('booting'));

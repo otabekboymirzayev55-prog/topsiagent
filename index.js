@@ -11,6 +11,10 @@ import { registerChatFeatureRoutes, validImageId, imageContentForSearch, validat
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "256kb" }));
+const appUrl = new URL(process.env.PUBLIC_APP_URL || "https://topagent-frontend.vercel.app/");
+if (appUrl.protocol !== "https:" && !(appUrl.protocol === "http:" && appUrl.hostname === "localhost"))
+  throw new Error("PUBLIC_APP_URL must be an HTTPS URL or localhost");
+const emailRedirectTo = `${appUrl.origin}/`;
 
 // ── Health ───────────────────────────────────────────────────────────────────
 app.get("/health", (_, res) => res.json({ status: "ok", revision: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || null }));
@@ -19,9 +23,22 @@ app.get("/health", (_, res) => res.json({ status: "ok", revision: process.env.RE
 app.post("/api/auth/signup", async (req, res) => {
   const { email, password } = req.body;
   if (typeof email !== "string" || typeof password !== "string") return res.status(400).json({ error: "Email and password are required" });
-  const { data, error } = await createAuthClient().auth.signUp({ email, password });
+  const { data, error } = await createAuthClient().auth.signUp({
+    email, password, options: { emailRedirectTo }
+  });
   if (error) return res.status(400).json({ error: error.message });
   res.json({ user: data.user, session: data.session });
+});
+
+app.post("/api/auth/resend-confirmation", async (req, res) => {
+  const email = req.body?.email;
+  if (typeof email !== "string" || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ error: "Valid email is required" });
+  const { error } = await createAuthClient().auth.resend({
+    type: "signup", email, options: { emailRedirectTo }
+  });
+  if (error) return res.status(error.status === 429 ? 429 : 400).json({ error: error.message });
+  res.json({ ok: true });
 });
 
 // ── Auth: Sign in ────────────────────────────────────────────────────────────

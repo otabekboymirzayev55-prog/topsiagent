@@ -319,6 +319,31 @@ test('sign-in moves guest chats to the account and loads them on return', async 
   } finally { await browser.close(); }
 });
 
+test('expired confirmation offers a new email and clears callback tokens', async () => {
+  const browser = await chromium.launch({ headless: true, executablePath: browserPath });
+  try {
+    const page = await browser.newPage();
+    const resent = [];
+    await page.route('https://topsiagent.onrender.com/api/auth/resend-confirmation', async route => {
+      resent.push(route.request().postDataJSON());
+      await route.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'});
+    });
+    await page.goto(`${url}#error=access_denied&error_code=otp_expired`);
+    assert.match(await page.locator('#authError').innerText(),/eskirgan yoki ishlatilgan/);
+    assert.equal(await page.locator('#resendConfirmation').isVisible(),true);
+    assert.equal(new URL(page.url()).hash,'');
+    await page.locator('#authEmail').fill('buyer@example.com');
+    await page.locator('#resendConfirmation').click();
+    await page.locator('#authStatus').waitFor({state:'visible'});
+    assert.deepEqual(resent,[{email:'buyer@example.com'}]);
+    assert.match(await page.locator('#authStatus').innerText(),/Yangi havola yuborildi/);
+    await page.goto(`${url}#access_token=sample&refresh_token=sample`);
+    await page.reload();
+    assert.match(await page.locator('#authStatus').innerText(),/Email tasdiqlandi/);
+    assert.equal(new URL(page.url()).hash,'');
+  } finally { await browser.close(); }
+});
+
 test('signed-in chat can attach an image, rename, share, regenerate and delete safely', async () => {
   const browser = await chromium.launch({ headless: true, executablePath: browserPath });
   try {
