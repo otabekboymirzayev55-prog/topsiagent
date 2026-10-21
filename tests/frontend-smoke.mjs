@@ -89,7 +89,7 @@ test('Top chat keeps context and follow-ups during a guest visit', async () => {
     assert.ok((await page.locator('#suggestions').innerText()).includes('Batareyasi uzoqroq bo‘lsin'));
     await page.locator('.compare-pick input').nth(0).check();
     await page.locator('.compare-pick input').nth(1).check();
-    await page.locator('#compareAction').click();
+    await page.locator('.message-products .compare-action').click();
     assert.equal(await page.locator('#compareDialog').isVisible(), true);
     assert.match(await page.locator('#compareTable').innerText(), /Sony WH-CH720N/);
     await page.locator('#closeDialog').click();
@@ -99,7 +99,7 @@ test('Top chat keeps context and follow-ups during a guest visit', async () => {
     assert.equal(requests[1].history[0].content, '200 dollargacha quloqchin');
     assert.equal(requests[1].history.find(turn => turn.products)?.products[0].title, 'Sony WH-CH720N');
     assert.equal(await page.locator('.card').count(), 2);
-    assert.match(await page.locator('#suggestions').innerText(), /Xarid variantlari/);
+    assert.doesNotMatch(await page.locator('#suggestions').innerText(), /Xarid variantlari/,'a clarification must not show a purchase action from an older result');
     assert.equal(await page.locator('#historyList .history-item').count(), 1);
     await page.locator('#openSearch').click();
     assert.equal(await page.locator('#searchDialog').isVisible(),true);
@@ -241,7 +241,8 @@ test('send readiness, thinking motion and IME input behave like a chat app', asy
     await page.locator('#input').press('Enter');
     await page.locator('.message.loading .thinking-dots').waitFor();
     assert.equal(searches,1);
-    assert.equal(await page.locator('#send').isDisabled(),true);
+    assert.equal(await page.locator('#send').isEnabled(),true);
+    assert.equal(await page.locator('#send').getAttribute('aria-label'),'Javobni to‘xtatish');
     assert.equal(await page.locator('.thinking-dots i').count(),3);
     assert.equal(await page.locator('.thinking-dots i').first().evaluate(el=>getComputedStyle(el).animationName),'thinking');
     await page.emulateMedia({reducedMotion:'reduce'});
@@ -449,4 +450,317 @@ test('signed-in chat can attach an image, rename, share, regenerate and delete s
     await page.locator('.history-item').waitFor({state:'detached'});
     assert.equal(chats.length,0);
   } finally { await browser.close(); }
+});
+
+test('each assistant turn keeps its own products and comparison while users stay on the right', async () => {
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  try {
+    const page=await browser.newPage({viewport:{width:1440,height:900},reducedMotion:'reduce'});
+    const backpackProducts=[
+      {title:'Maktab ryukzagi A',store:'Uzum',url:'https://uzum.uz/uz/product/ryukzak-a',price:99000,currency:'UZS'},
+      {title:'Maktab ryukzagi B',store:'Uzum',url:'https://uzum.uz/uz/product/ryukzak-b',price:120000,currency:'UZS'}
+    ];
+    const phoneProducts=[
+      {title:'Redmi Note 14',store:'Olcha',url:'https://olcha.uz/uz/product/redmi-note-14'},
+      {title:'Samsung A56',store:'Olcha',url:'https://olcha.uz/uz/product/samsung-a56'}
+    ];
+    let calls=0;
+    await page.route('https://topsiagent.onrender.com/api/search',async route=>{
+      const replies=[
+        {type:'results',reply:'Ryukzak variantlari.',products:backpackProducts},
+        {type:'results',reply:'Telefon variantlari.',products:phoneProducts},
+        {type:'clarify',reply:'Qaysi rangni xohlaysiz?',products:[]}
+      ];
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(replies[calls++])});
+    });
+    await page.goto(url);
+    for(const [query,reply] of [['Ryukzak kerak','Ryukzak variantlari.'],['Telefon kerak','Telefon variantlari.'],['Boshqa rang kerak','Qaysi rangni xohlaysiz?']]) {
+      await page.locator('#input').fill(query);
+      await page.locator('#send').click();
+      await page.locator('#messages').getByText(reply,{exact:true}).waitFor();
+      await page.waitForFunction(()=>!document.querySelector('.message.loading'));
+    }
+    const turns=page.locator('#messages > .message.assistant');
+    assert.equal(await turns.count(),3);
+    assert.deepEqual(await turns.nth(0).locator('.card h3').allInnerTexts(),backpackProducts.map(item=>item.title));
+    assert.deepEqual(await turns.nth(1).locator('.card h3').allInnerTexts(),phoneProducts.map(item=>item.title));
+    assert.equal(await turns.nth(2).locator('.card').count(),0);
+    assert.equal(await page.locator('#contentScroll > .results').count(),0,'products belong to their reply, not a detached result section');
+    const firstGroup=turns.nth(0).locator('.message-products');
+    await firstGroup.locator('.compare-pick input').nth(0).check();
+    await firstGroup.locator('.compare-pick input').nth(1).check();
+    await firstGroup.locator('.compare-action').click();
+    const comparison=await page.locator('#compareTable').innerText();
+    assert.match(comparison,/Maktab ryukzagi A/);
+    assert.match(comparison,/Maktab ryukzagi B/);
+    assert.doesNotMatch(comparison,/Redmi|Samsung/,'old results compare their own products');
+    await page.locator('#closeDialog').click();
+    for(const viewport of [{width:1440,height:900},{width:390,height:844}]) {
+      await page.setViewportSize(viewport);
+      await hideRail(page);
+      const user=await page.locator('#messages > .message.user .message-text').first().boundingBox();
+      const assistant=await turns.nth(0).locator('.message-text').boundingBox();
+      const messages=await page.locator('#messages').boundingBox();
+      assert.ok(user.x>assistant.x+30,'user bubble starts to the right of assistant text');
+      assert.ok(Math.abs(user.x+user.width-(messages.x+messages.width))<3,'user bubble aligns with the right conversation edge');
+      assert.equal(await page.locator('.message.user .message-avatar').first().isVisible(),false);
+      assert.equal(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth),true);
+      assert.equal(await page.locator('.card').count(),4);
+      if(viewport.width===390) {
+        const cards=await firstGroup.locator('.card').all();
+        const a=await cards[0].boundingBox(),b=await cards[1].boundingBox();
+        assert.ok(b.y>=a.y+a.height,'mobile cards stack inside their reply');
+      }
+    }
+    await showRail(page);
+    await page.locator('#railNew').click();
+    await showRail(page);
+    await page.locator('#historyList .history-open').click();
+    assert.equal(await page.locator('#messages .message-products').count(),2,'reopening restores every product group');
+    assert.deepEqual(await page.locator('#messages .card h3').allInnerTexts(),[...backpackProducts,...phoneProducts].map(item=>item.title));
+  } finally {await browser.close();}
+});
+
+test('stopping generation leaves the question and prevents a late reply from entering another request', async () => {
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  let releaseOld;
+  const held=new Promise(resolve=>{releaseOld=resolve;});
+  let oldDone;
+  const oldFinished=new Promise(resolve=>{oldDone=resolve;});
+  let oldStarted;
+  const oldReceived=new Promise(resolve=>{oldStarted=resolve;});
+  try {
+    const page=await browser.newPage({reducedMotion:'reduce'});
+    await page.route('https://topsiagent.onrender.com/api/search',async route=>{
+      const query=route.request().postDataJSON().query;
+      if(query==='Birinchi savol') {
+        oldStarted();
+        await held;
+        await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({type:'clarify',reply:'Kechikkan eski javob',products:[]})}).catch(()=>{});
+        oldDone();
+      } else await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({type:'clarify',reply:'Yangi javob',products:[]})});
+    });
+    await page.goto(url);
+    await page.locator('#input').fill('Birinchi savol');
+    await page.locator('#send').click();
+    await page.locator('.message.loading').waitFor();
+    await oldReceived;
+    await page.getByRole('button',{name:'Javobni to‘xtatish',exact:true}).click();
+    await page.locator('.message.loading').waitFor({state:'detached'});
+    assert.deepEqual(await page.locator('.message.user .message-text').allInnerTexts(),['Birinchi savol']);
+    assert.equal(await page.locator('#send').isDisabled(),true);
+    await page.locator('#input').fill('Ikkinchi savol');
+    await page.locator('#send').click();
+    await page.locator('#messages').getByText('Yangi javob',{exact:true}).waitFor();
+    releaseOld();
+    await oldFinished;
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(await page.getByText('Kechikkan eski javob',{exact:true}).count(),0);
+    assert.equal(await page.locator('#messages .message.assistant').count(),1);
+    assert.deepEqual(await page.locator('.message.user .message-text').allInnerTexts(),['Birinchi savol','Ikkinchi savol']);
+    assert.equal(await page.locator('#send').getAttribute('aria-label'),'Yuborish');
+  } finally {releaseOld();await browser.close();}
+});
+
+test('editing a question keeps the old branch on failure and replaces it only after success', async () => {
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  try {
+    const page=await browser.newPage({reducedMotion:'reduce'});
+    let editAttempts=0;
+    const queries=[];
+    await page.route('https://topsiagent.onrender.com/api/search',async route=>{
+      const body=route.request().postDataJSON();queries.push(body);
+      let status=200,data;
+      if(body.query==='Yangi savol') {
+        editAttempts++;
+        if(editAttempts===1){status=500;data={error:'Temporary failure'};}
+        else data={type:'clarify',reply:'Tahrirlangan javob',products:[]};
+      } else if(body.query==='Birinchi savol') data={type:'results',reply:'Eski mahsulotlar',products:[{title:'Eski ryukzak',store:'Uzum',url:'https://uzum.uz/uz/product/eski-ryukzak'}]};
+      else data={type:'clarify',reply:'Keyingi javob',products:[]};
+      await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
+    });
+    await page.goto(url);
+    for(const [query,reply] of [['Birinchi savol','Eski mahsulotlar'],['Keyingi savol','Keyingi javob']]) {
+      await page.locator('#input').fill(query);await page.locator('#send').click();
+      await page.locator('#messages').getByText(reply,{exact:true}).waitFor();
+      await page.waitForFunction(()=>!document.querySelector('.message.loading'));
+    }
+    await page.getByRole('button',{name:'Xabarni tahrirlash',exact:true}).first().click();
+    const editor=page.locator('.message-editor');
+    await editor.locator('textarea').fill('Yangi savol');
+    await editor.getByRole('button',{name:'Saqlash va yuborish',exact:true}).click();
+    await editor.getByText('Yangi javob olinmadi. Oldingi suhbat saqlandi. Qayta urinib ko‘ring.',{exact:true}).waitFor();
+    assert.equal(await page.locator('#messages > .message').count(),4);
+    assert.equal(await page.locator('#messages .card h3').innerText(),'Eski ryukzak');
+    assert.equal(await page.locator('.message.user .message-text').first().textContent(),'Birinchi savol');
+    assert.equal(await page.getByText('Keyingi javob',{exact:true}).count(),1);
+    await editor.getByRole('button',{name:'Saqlash va yuborish',exact:true}).click();
+    await page.locator('#messages').getByText('Tahrirlangan javob',{exact:true}).waitFor();
+    assert.equal(await page.locator('.message-editor').count(),0);
+    assert.equal(await page.locator('#messages > .message').count(),2);
+    assert.deepEqual(await page.locator('.message.user .message-text').allInnerTexts(),['Yangi savol']);
+    assert.equal(await page.getByText('Keyingi javob',{exact:true}).count(),0);
+    assert.equal(await page.locator('#messages .card').count(),0);
+    assert.deepEqual(queries.at(-1).history,[],'an edited first turn cannot inherit its discarded future');
+  } finally {await browser.close();}
+});
+
+test('reading older messages is preserved when a reply arrives and the latest button returns to the bottom', async () => {
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  let releaseReply;
+  const held=new Promise(resolve=>{releaseReply=resolve;});
+  try {
+    const page=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
+    let calls=0;
+    await page.route('https://topsiagent.onrender.com/api/search',async route=>{
+      calls++;
+      if(calls===2) await held;
+      const reply=calls===1?'Batafsil sharh. '.repeat(650):'Yangi javob tayyor.';
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({type:'clarify',reply,products:[]})});
+    });
+    await page.goto(url);
+    await page.locator('#input').fill('Batafsil sharh kerak');await page.locator('#send').click();
+    await page.waitForFunction(()=>document.querySelectorAll('#messages .message.assistant:not(.loading)').length===1);
+    await page.locator('#input').fill('Yana tavsiya kerak');await page.locator('#send').click();
+    await page.locator('.message.loading').waitFor();
+    await page.locator('#contentScroll').evaluate(el=>{el.scrollTop=0;});
+    await page.locator('#scrollLatest').waitFor({state:'visible'});
+    releaseReply();
+    await page.locator('#messages').getByText('Yangi javob tayyor.',{exact:true}).waitFor();
+    await page.waitForFunction(()=>!document.querySelector('.message.loading'));
+    assert.equal(await page.locator('#contentScroll').evaluate(el=>el.scrollTop),0,'answer completion must not interrupt reading old messages');
+    assert.equal(await page.locator('#scrollLatest').isVisible(),true);
+    await page.locator('#scrollLatest').click();
+    await page.waitForFunction(()=>{const el=document.querySelector('#contentScroll');return el.scrollHeight-el.clientHeight-el.scrollTop<3;});
+    assert.equal(await page.locator('#scrollLatest').isVisible(),false);
+  } finally {releaseReply();await browser.close();}
+});
+
+test('guest saved products can compare across reply groups and removal does not erase chat cards', async () => {
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  try {
+    const page=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
+    const products=[
+      {title:'Saqlangan ryukzak',store:'Uzum',url:'https://uzum.uz/uz/product/saved-backpack',price:99000,currency:'UZS'},
+      {title:'Saqlangan telefon',store:'Olcha',url:'https://olcha.uz/uz/product/saved-phone',price:2000000,currency:'UZS'}
+    ];
+    let calls=0;
+    await page.route('https://topsiagent.onrender.com/api/search',async route=>{
+      const index=calls++;
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({type:'results',reply:`Natija ${index+1}`,products:[products[index]]})});
+    });
+    await page.goto(url);
+    for(let index=0;index<2;index++) {
+      await page.locator('#input').fill(index?'Telefon top':'Ryukzak top');
+      await page.locator('#send').click();
+      await page.locator('#messages').getByText(`Natija ${index+1}`,{exact:true}).waitFor();
+      await page.locator('.message-products .save-product').nth(index).click();
+      assert.equal(await page.locator('.message-products .save-product').nth(index).getAttribute('aria-pressed'),'true');
+    }
+    await showRail(page);
+    await page.locator('#savedButton').click();
+    await page.locator('#savedDialog').waitFor({state:'visible'});
+    assert.equal(await page.locator('#shell').evaluate(el=>el.inert),true,'background chat is inert while saved products is open');
+    assert.deepEqual(await page.locator('#savedList .saved-item h3').allInnerTexts(),products.map(product=>product.title));
+    assert.match(await page.locator('#savedStatus').innerText(),/Mehmon/);
+    assert.equal(await page.locator('#savedList .watching-badge').count(),0);
+    assert.equal(await page.getByRole('button',{name:'Narxni kuzatish uchun kirish',exact:true}).count(),2,'guest saves do not pretend automatic tracking is active');
+    await page.locator('#savedList input[type=checkbox]').nth(0).check();
+    await page.locator('#savedList input[type=checkbox]').nth(1).check();
+    await page.locator('#compareSaved').click();
+    assert.equal(await page.locator('#savedDialog').evaluate(el=>el.inert),true,'only the upper comparison dialog remains interactive');
+    assert.equal(await page.locator('#compareDialog').evaluate(el=>el.inert),false);
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(()=>!!document.activeElement.closest('#compareDialog')),true,'keyboard focus stays inside the upper dialog');
+    assert.match(await page.locator('#compareTable').innerText(),/Saqlangan ryukzak/);
+    assert.match(await page.locator('#compareTable').innerText(),/Saqlangan telefon/);
+    await page.locator('#closeDialog').click();
+    assert.equal(await page.locator('#savedDialog').evaluate(el=>el.inert),false);
+    await page.locator('#savedList .saved-item').first().getByRole('button',{name:'Olib tashlash',exact:true}).click();
+    assert.equal(await page.locator('#savedList .saved-item').count(),1);
+    await page.locator('#closeSaved').click();
+    assert.equal(await page.locator('#shell').evaluate(el=>el.inert),false);
+    await hideRail(page);
+    assert.equal(await page.locator('#messages .card').count(),2,'removing a save never removes the original recommendation');
+    assert.equal(await page.locator('#messages .save-product').first().getAttribute('aria-pressed'),'false');
+    assert.equal(await page.locator('#messages .save-product').nth(1).getAttribute('aria-pressed'),'true');
+  } finally {await browser.close();}
+});
+
+test('an unavailable verified price cannot activate account price tracking', async () => {
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  try {
+    const page=await browser.newPage({reducedMotion:'reduce'});
+    await page.addInitScript(()=>localStorage.setItem('top_session_v1',JSON.stringify({
+      access_token:'token',refresh_token:'refresh',expires_at:Math.floor(Date.now()/1000)+3600,
+      user:{id:'watch-user',email:'watch@example.com'}
+    })));
+    let watchAttempts=0;
+    const product={id:'saved-1',title:'Narxi noma’lum ryukzak',store:'Uzum',url:'https://uzum.uz/uz/product/no-price',price:null,currency:null,trackingEnabled:false};
+    await page.route('https://topsiagent.onrender.com/api/**',async route=>{
+      const request=route.request(),path=new URL(request.url()).pathname;
+      let status=200,data;
+      if(path==='/api/chats') data={chats:[]};
+      else if(path==='/api/saved-products'&&request.method()==='GET')data={products:[product],priceTracking:{automaticEnabled:true,manualCheck:true}};
+      else if(path==='/api/price-notifications')data={notifications:[]};
+      else if(path==='/api/saved-products/saved-1'&&request.method()==='PATCH'){
+        watchAttempts++;assert.equal(request.postDataJSON().trackingEnabled,true);
+        status=422;data={error:'No verified price available',code:'PRICE_UNAVAILABLE'};
+      }else{status=404;data={error:'Unexpected API route'};}
+      await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
+    });
+    await page.goto(url);
+    await showRail(page);await page.locator('#savedButton').click();
+    await page.locator('#savedList .saved-item').waitFor();
+    await page.getByRole('button',{name:'Narxni kuzatish',exact:true}).click();
+    await page.locator('#savedStatus').getByText(/aniq narx olinmadi/).waitFor();
+    assert.equal(watchAttempts,1);
+    assert.equal(await page.locator('#savedList .watching-badge').count(),0);
+    assert.equal(await page.getByRole('button',{name:'Kuzatuvni o‘chirish',exact:true}).count(),0);
+    assert.equal(await page.getByRole('button',{name:'Narxni kuzatish',exact:true}).isEnabled(),true);
+  } finally {await browser.close();}
+});
+
+test('signing out during session refresh cannot restore the old account or send authenticated reads',async()=>{
+  const browser=await chromium.launch({headless:true,executablePath:browserPath});
+  let releaseRefresh;
+  const held=new Promise(resolve=>{releaseRefresh=resolve;});
+  let refreshStarted;
+  const started=new Promise(resolve=>{refreshStarted=resolve;});
+  let refreshDone;
+  const handled=new Promise(resolve=>{refreshDone=resolve;});
+  try {
+    const page=await browser.newPage({reducedMotion:'reduce'});
+    await page.addInitScript(()=>localStorage.setItem('top_session_v1',JSON.stringify({
+      access_token:'expired-token-a',refresh_token:'refresh-a',expires_at:Math.floor(Date.now()/1000)-60,
+      user:{id:'account-a',email:'account-a@example.com'}
+    })));
+    const authenticatedReads=[];
+    let refreshCalls=0;
+    await page.route('https://topsiagent.onrender.com/api/**',async route=>{
+      const request=route.request(),path=new URL(request.url()).pathname;
+      if(path==='/api/auth/refresh') {
+        refreshCalls++;refreshStarted();await held;
+        await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+          user:{id:'account-a',email:'account-a@example.com'},
+          session:{access_token:'new-token-a',refresh_token:'refresh-a',expires_at:Math.floor(Date.now()/1000)+3600}
+        })});
+        refreshDone();return;
+      }
+      if(request.headers().authorization)authenticatedReads.push(path);
+      const data=path==='/api/chats'?{chats:[]}:path==='/api/saved-products'?{products:[]}:path==='/api/price-notifications'?{notifications:[]}:{error:'Unexpected route'};
+      await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)});
+    });
+    await page.goto(url);await started;
+    await showRail(page);await page.locator('#accountButton').click();
+    await page.locator('#signOut').click();
+    assert.equal(await page.evaluate(()=>localStorage.getItem('top_session_v1')),null);
+    assert.equal(await page.locator('#accountLabel').innerText(),'Kirish');
+    releaseRefresh();await handled;
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    assert.equal(refreshCalls,1,'startup account requests share a single session refresh');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('top_session_v1')),null,'late refresh must not restore a signed-out session');
+    assert.equal(await page.locator('#accountLabel').innerText(),'Kirish');
+    assert.deepEqual(authenticatedReads,[],'no saved-products or chat read may use the old account after sign-out');
+  } finally {releaseRefresh();await browser.close();}
 });

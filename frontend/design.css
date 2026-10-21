@@ -90,3 +90,104 @@ input:focus-visible,textarea:focus-visible{outline:2px solid #555;outline-offset
   .grid{grid-template-columns:1fr}
   :root.dark .model-picker,:root.dark .mobile-menu,:root.dark .welcome-suggestions .suggestion{background:var(--surface);border-color:var(--line)}
 }
+
+/* Conversational messages and product groups stay in their original turns. */
+.content-scroll{overflow-x:hidden;scroll-padding-block-end:var(--composer-space,140px)}
+.messages,.message,.message-body{max-width:100%;min-width:0}
+.message.user{justify-content:flex-end;gap:0;margin-bottom:26px}
+.message.user .message-avatar{display:none}
+.message.user>.message-body{display:flex;flex:0 1 auto;flex-direction:column;align-items:flex-end;max-width:80%}
+.message.user .message-text{width:fit-content;max-width:100%;margin-top:0;padding:11px 16px;border-radius:20px 20px 5px 20px;background:var(--soft);color:var(--ink);text-align:left}
+.message.user .message-image{margin:0 0 7px;max-width:min(280px,100%)}
+.message.user .message-actions{justify-content:flex-end;margin-top:4px;gap:3px;opacity:0;transition:opacity .15s ease}
+.message.user:hover .message-actions,.message.user:focus-within .message-actions{opacity:1}
+.message.assistant>.message-body{flex:1 1 0;min-width:0}
+.message.assistant .message-text{max-width:100%}
+.message-products.results{container-type:inline-size;container-name:product-group;width:100%;max-width:none;min-width:0;margin:18px 0 0;padding:0}
+.message-products .results-top{align-items:flex-start;gap:10px;margin-bottom:8px}
+.message-products .results-top h2{font-size:16px;line-height:1.4}
+.message-products .results-count{flex:none;font-size:11px}
+.message-products .result-note{margin-bottom:13px;font-size:11px}
+.message-products .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
+.message-products .card{padding:16px;min-width:0}
+.message-products .card-top{align-items:flex-start;gap:8px;margin-bottom:12px}
+.message-products .store{min-width:0;overflow-wrap:anywhere}
+.message-products .rank{flex:none}
+.message-products .card h3,.message-products .reason{overflow-wrap:anywhere}
+.message-products .card h3{font-size:14px}
+.message-products .price{font-size:20px;overflow-wrap:anywhere}
+.message-products .card-bottom{gap:10px}
+.message-products .purchase-choices{min-width:0;max-width:100%}
+.message-products .store-link{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.message-products .compare-bar{max-width:100%;flex-wrap:wrap;gap:10px;margin-top:12px;padding:9px 11px}
+.message-products .compare-action{flex:none}
+.message-body:has(.message-editor){width:min(100%,600px)}
+.message.user>.message-body:has(.message-editor){max-width:90%;align-items:stretch}
+.message-editor:not(textarea){width:100%;min-width:0;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);animation:fade-in .15s ease-out}
+.message-editor textarea,textarea.message-editor{display:block;width:100%;min-height:96px;max-height:260px;padding:0;resize:vertical;overflow-y:auto;font-size:15px;line-height:24px;color:var(--ink);background:transparent}
+textarea.message-editor{padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.editor-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:10px}
+.editor-actions button{min-height:34px;padding:8px 13px;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--ink);font-size:12px}
+.editor-actions button:hover{background:var(--rail)}
+.editor-actions button.primary{border-color:var(--blue);background:var(--blue);color:var(--button-ink)}
+.editor-actions button.primary:hover{background:var(--blue-hover)}
+.editor-actions button:disabled{opacity:.5}
+.scroll-latest{position:absolute;z-index:4;left:50%;bottom:calc(var(--composer-space,140px) - 12px);display:grid;place-items:center;width:32px;height:32px;padding:0;transform:translateX(-50%);border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--ink);box-shadow:0 2px 8px rgb(0 0 0 / 8%);animation:fade-in .15s ease-out}
+.scroll-latest svg{width:17px;height:17px}
+.scroll-latest:hover{background:var(--rail)}
+.scroll-latest:active:not(:disabled){transform:translateX(-50%) scale(.96)}
+.send.stopping{background:var(--blue);color:var(--button-ink)}
+.send.stopping svg{width:14px;height:14px;fill:currentColor;stroke:none}
+:root.dark .message.user .message-text{background:var(--soft)}
+:root.dark .scroll-latest{box-shadow:0 2px 8px rgb(0 0 0 / 20%)}
+@container product-group (max-width:540px){.message-products .grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:720px){
+  .message{gap:10px;margin-bottom:26px}
+  .message.user>.message-body{max-width:86%}
+  .message.user .message-text{padding:10px 14px}
+  .message.user .message-actions{opacity:1}
+  .message.user>.message-body:has(.message-editor){max-width:100%;width:100%}
+  .message-products .grid{grid-template-columns:minmax(0,1fr)}
+  .message-products .card{padding:15px}
+  .message-products .results-top h2{font-size:15px}
+  .message-products .store-link{padding:9px 11px}
+  .message-products .compare-pick{min-height:30px}
+  .editor-actions button{min-height:38px}
+  .scroll-latest{width:34px;height:34px}
+}
+@media(hover:none),(pointer:coarse){.message.user .message-actions{opacity:1}}
+@media(prefers-reduced-motion:reduce){.message.user .message-actions,.message-editor,.scroll-latest{animation:none!important;transition:none!important}.scroll-latest:active:not(:disabled){transform:translateX(-50%)}}
+
+
+/* Saved products and price-watch controls. */
+.saved-box{width:min(720px,100%)}
+.saved-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.saved-toolbar label{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+.saved-toolbar button,.saved-actions button,.saved-actions a{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:8px 11px;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--ink);font-size:12px;line-height:1.35;text-decoration:none}
+.saved-toolbar button:hover,.saved-actions button:hover,.saved-actions a:hover{background:var(--rail)}
+.saved-toolbar button.primary,.saved-actions button.primary{border-color:var(--blue);background:var(--blue);color:var(--button-ink)}
+.saved-toolbar button:disabled,.saved-actions button:disabled{opacity:.45}
+.saved-actions button[aria-pressed="true"]{border-color:var(--blue);background:var(--soft);color:var(--ink)}
+#savedList{display:grid;gap:12px}
+.saved-item{min-width:0;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--page)}
+.saved-item h3{margin:0 0 8px;font-size:15px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}
+.saved-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;color:var(--muted);font-size:12px;line-height:1.5}
+.saved-meta .price{font-size:17px;color:var(--ink)}
+.saved-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:12px}
+.saved-actions svg{width:14px;height:14px}
+.watching-badge,.watch-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--muted);font-size:10px;line-height:1.4}
+#savedStatus:empty,#priceNotifications:empty{display:none}
+#priceNotifications{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.price-notification{padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--rail);color:var(--muted);font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.price-notification strong{color:var(--ink);font-weight:600}
+.price-notification a{color:var(--ink);text-underline-offset:2px}
+.save-product{display:grid;place-items:center;flex:none;width:28px;height:28px;margin:-5px -5px -5px auto;padding:5px;border-radius:7px;background:transparent;color:var(--muted)}
+.save-product svg{width:16px;height:16px}
+.save-product:hover,.save-product[aria-pressed="true"],.save-product.saved{background:var(--soft);color:var(--ink)}
+.save-product[aria-pressed="true"] svg,.save-product.saved svg{fill:currentColor}
+@media(max-width:720px){
+  .saved-box{padding:20px}
+  .saved-item{padding:14px}
+  .saved-toolbar button,.saved-actions button,.saved-actions a{min-height:38px}
+  .save-product{width:32px;height:32px;margin:-5px -5px -5px auto}
+}

@@ -38,10 +38,10 @@ let lang = 'uz';
 let darkTheme = localStorage.getItem('top_v0_theme_v1') === 'dark';
 let session = readJson('top_session_v1', null);
 let user = session?.user || null;
+let authGeneration = 0;
+let refreshTask = null;
 let chats = user ? readChats() : [];
 let activeId = user ? localStorage.getItem(activeKey()) || null : null;
-let products = [];
-let selected = new Set();
 let loading = false;
 let requestController = null;
 let authMode = 'login';
@@ -53,7 +53,8 @@ let pendingImage = null;
 let previewUrl = null;
 let actionChat = null;
 const renderedMessageCounts = new Map();
-let dialogReturnFocus = null;
+const dialogFocus = new Map();
+const openDialogs = [];
 
 function t(key) { return copy[lang][key]; }
 function readJson(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } }
@@ -71,15 +72,27 @@ function persist() {
 function activeChat() { return chats.find(chat => chat.id === activeId) || null; }
 function touch(chat) { chat.updatedAt = new Date().toISOString(); persist(); }
 function titleFrom(text) { return text.trim().replace(/\s+/g,' ').slice(0, 55); }
-function scrollBottom(smooth=false) { $('contentScroll').scrollTo({top:$('contentScroll').scrollHeight,behavior:smooth&&!matchMedia('(prefers-reduced-motion: reduce)').matches?'smooth':'auto'}); }
-function updateSendState() { $('send').disabled = loading || (!$('input').value.trim() && !pendingImage); $('send').classList.toggle('ready',!$('send').disabled); }
+function nearBottom() { const scroller=$('contentScroll'); return scroller.scrollHeight-scroller.clientHeight-scroller.scrollTop<100; }
+function updateScrollLatest() { $('scrollLatest').hidden=!activeChat()?.messages.length || nearBottom(); }
+function scrollBottom(smooth=false) { $('contentScroll').scrollTo({top:$('contentScroll').scrollHeight,behavior:smooth&&!matchMedia('(prefers-reduced-motion: reduce)').matches?'smooth':'auto'}); updateScrollLatest(); }
+function updateSendState() {
+  const button=$('send'); button.disabled=!loading && (!$('input').value.trim() && !pendingImage);
+  button.classList.toggle('ready',!button.disabled); button.classList.toggle('stopping',loading);
+  button.setAttribute('aria-label',loading?'Javobni to‘xtatish':'Yuborish'); button.title=loading?'Javobni to‘xtatish':'Yuborish';
+  button.querySelector('use').setAttribute('href',loading?'#icon-stop':'#icon-send');
+}
+function stopGeneration() {
+  const controller=requestController; requestController=null; controller?.abort(); loading=false; updateSendState();
+  renderConversation({preserveScroll:true});
+}
 function closeRail() { $('rail').classList.remove('open'); $('shell').classList.add('sidebar-closed'); $('backdrop').classList.remove('open'); $('mobileMenu').setAttribute('aria-expanded','false'); if($('rail').contains(document.activeElement)) $('mobileMenu').focus(); $('rail').inert=true; }
 function openRail() { $('rail').inert=false; $('rail').classList.add('open'); $('shell').classList.remove('sidebar-closed'); $('backdrop').classList.add('open'); $('mobileMenu').setAttribute('aria-expanded','true'); }
 function closeRailOnMobile() { if(matchMedia('(max-width:720px)').matches) closeRail(); }
 function closeTopMenu() { $('topMenu').hidden=true; $('topMore').setAttribute('aria-expanded','false'); $('brandButton').setAttribute('aria-expanded','false'); }
 function toggleTopMenu() { const opening=$('topMenu').hidden; $('topMenu').hidden=!opening; for(const id of ['topMore','brandButton']) $(id).setAttribute('aria-expanded',String(opening)); if(opening) $('newSearch').focus(); }
-function showDialog(id,focusId) { dialogReturnFocus=document.activeElement; $(id).classList.add('open'); if(focusId) $(focusId).focus(); }
-function hideDialog(id) { if(!$(id).classList.contains('open'))return; $(id).classList.remove('open'); if(dialogReturnFocus?.isConnected) dialogReturnFocus.focus(); }
+function updateDialogStack() { $('shell').inert=openDialogs.length>0;openDialogs.forEach((id,index)=>{const dialog=$(id);dialog.style.zIndex=String(50+index*2);dialog.inert=index!==openDialogs.length-1;dialog.setAttribute('aria-modal',String(index===openDialogs.length-1));}); }
+function showDialog(id,focusId) { if(!$(id).classList.contains('open')){dialogFocus.set(id,document.activeElement);openDialogs.push(id);} $(id).classList.add('open');updateDialogStack();if(focusId)$(focusId).focus(); }
+function hideDialog(id) { if(!$(id).classList.contains('open'))return;$(id).classList.remove('open');$(id).inert=false;openDialogs.splice(openDialogs.indexOf(id),1);updateDialogStack();const target=dialogFocus.get(id);dialogFocus.delete(id);if(target?.isConnected&&!target.closest('[inert]'))target.focus(); }
 function openSettings() { closeTopMenu(); showDialog('settingsDialog','themeToggle'); }
 function openChatSearch() { closeTopMenu(); $('historySearch').value=''; renderSearchResults(); showDialog('searchDialog','historySearch'); }
 function searchText(value) { return String(value||'').toLocaleLowerCase('uz').replace(/[’‘`]/g,"'"); }
@@ -113,8 +126,6 @@ function setLanguage() {
   $('historySearch').setAttribute('aria-label', 'Chatlarni qidirish');
   $('mobileMenu').setAttribute('aria-label', 'Panelni ochish');
   $('input').placeholder = t('placeholder');
-  $('resultsHeading').textContent = t('results');
-  $('compareAction').textContent = t('compare');
   $('compareTitle').textContent = t('compareTitle');
   $('authDescription').textContent = t('authIntro');
   $('signOut').textContent = t('signOut');
@@ -174,20 +185,20 @@ function renderHistory() {
   if($('searchDialog').classList.contains('open')) renderSearchResults();
 }
 function selectChat(id) {
-  if (loading) { requestController?.abort(); loading=false; }
+  if (loading) stopGeneration();
   clearPendingImage();
-  activeId=id; persist(); $('input').value=''; $('input').style.height='auto'; updateSendState(); renderConversation(); closeRailOnMobile();
+  activeId=id; persist(); $('input').value=''; $('input').style.height='auto'; updateSendState(); renderConversation({forceBottom:true}); closeRailOnMobile();
 }
 function newChat() {
-  if (loading) { requestController?.abort(); loading=false; }
+  if (loading) stopGeneration();
   clearPendingImage();
   $('historySearch').value='';
-  activeId=null; products=[]; selected.clear(); persist(); $('input').value=''; $('input').style.height='auto'; updateSendState(); renderConversation(); closeTopMenu(); closeRailOnMobile(); $('input').focus();
+  activeId=null; persist(); $('input').value=''; $('input').style.height='auto'; updateSendState(); renderConversation({forceBottom:true}); closeTopMenu(); closeRailOnMobile(); $('input').focus();
 }
 async function deleteChat(chat) {
   if (!confirm(t('deleteConfirm'))) return;
   try {
-    if (activeId===chat.id && loading) { requestController?.abort(); loading=false; updateSendState(); }
+    if (activeId===chat.id && loading) stopGeneration();
     if (user) {
       await syncQueues.get(chat.id);
       if (!chat.remoteId) throw new Error('Chat hali hisobga saqlanmadi. Qayta urinib ko‘ring.');
@@ -333,12 +344,19 @@ function searchHistory(messages) {
     ...(imageId?{imageId}:{}),
     ...(role==='assistant' && safeProducts(products).length?{products:safeProducts(products)}:{})}));
 }
-function renderProducts() {
-  $('grid').replaceChildren(); $('count').textContent=products.length?t('count')(products.length):'';
-  $('resultsSection').hidden=!products.length; $('resultNote').hidden=!products.length; $('resultNote').textContent=t('note');
-  products.forEach((p,i)=>{
+function renderProducts(items) {
+  const section=document.createElement('section'); section.className='message-products results'; section.setAttribute('aria-label',t('results'));
+  const heading=document.createElement('div'); heading.className='results-top'; const title=document.createElement('h2'); title.textContent=t('results'); heading.append(title,span('results-count',t('count')(items.length)));
+  const note=document.createElement('p'); note.className='result-note'; note.textContent=t('note');
+  const grid=document.createElement('div'); grid.className='grid';
+  const selected=new Set(); const bar=document.createElement('div'); bar.className='compare-bar';
+  const count=span('compare-count',''); const compare=document.createElement('button'); compare.type='button'; compare.className='compare-action'; compare.textContent=t('compare');
+  const update=()=>{bar.classList.toggle('visible',selected.size>0);count.textContent=t('selected')(selected.size);compare.disabled=selected.size<2;};
+  compare.addEventListener('click',()=>showCompare([...selected].map(index=>items[index]))); bar.append(count,compare);
+  items.forEach((p,i)=>{
     const card=document.createElement('article'); card.className='card';
     const top=document.createElement('div'); top.className='card-top'; top.append(span('store',p.store),span('rank',String(i+1).padStart(2,'0')));
+    const save=actionButton('Mahsulotni saqlash','bookmark',()=>toggleSavedProduct(p)); save.classList.add('save-product'); save.dataset.productUrl=p.url; save.setAttribute('aria-pressed',String(isProductSaved(p.url))); top.append(save);
     const title=document.createElement('h3'); title.textContent=p.title;
     const price=document.createElement('div'); price.append(span(p.price==null?'price-unknown':'price',priceText(p)));
     const reason=document.createElement('p'); reason.className='reason'; reason.textContent=p.why||'';
@@ -348,18 +366,17 @@ function renderProducts() {
     const link=document.createElement('a'); link.className='store-link secondary'; link.textContent=t('open'); link.href=p.url; link.target='_blank'; link.rel='noopener noreferrer';
     choices.append(buy,link);
     const label=document.createElement('label'); label.className='compare-pick'; const box=document.createElement('input'); box.type='checkbox'; box.checked=selected.has(i); box.setAttribute('aria-label',`${t('compare')}: ${p.title}`);
-    box.addEventListener('change',()=>{ if(box.checked && selected.size>=3){box.checked=false;return;} box.checked?selected.add(i):selected.delete(i); updateCompare(); }); label.append(box,document.createTextNode(t('compare')));
-    bottom.append(choices,label); card.append(top,title,price,reason,bottom); $('grid').append(card);
+    box.addEventListener('change',()=>{ if(box.checked && selected.size>=3){box.checked=false;return;} box.checked?selected.add(i):selected.delete(i); update(); }); label.append(box,document.createTextNode(t('compare')));
+    bottom.append(choices,label); card.append(top,title,price,reason,bottom); grid.append(card);
   });
-  updateCompare();
+  update(); section.append(heading,note,grid,bar); return section;
 }
-function updateCompare() { $('compareBar').classList.toggle('visible',selected.size>0); $('compareCount').textContent=t('selected')(selected.size); $('compareAction').disabled=selected.size<2; }
-function showCompare() {
-  if (selected.size<2) return;
+function showCompare(items) {
+  if (items.length<2) return;
   const table=document.createElement('table'); table.className='compare-table';
   const rows=[['product',p=>p.title],['store',p=>p.store],['price',p=>priceText(p)],['fit',p=>p.why||'—'],['link',p=>p.url]];
   for(const [key,get] of rows){ const tr=document.createElement('tr'); const th=document.createElement('th'); th.scope='row'; th.textContent=t(key); tr.append(th);
-    for(const index of selected){ const td=document.createElement('td'); const p=products[index]; if(key==='link'){const a=document.createElement('a'); a.href=p.url; a.target='_blank'; a.rel='noopener noreferrer'; a.textContent=t('open'); td.append(a);} else td.textContent=get(p); tr.append(td); } table.append(tr);
+    for(const p of items){ const td=document.createElement('td'); if(key==='link'){const a=document.createElement('a'); a.href=p.url; a.target='_blank'; a.rel='noopener noreferrer'; a.textContent=t('open'); td.append(a);} else td.textContent=get(p); tr.append(td); } table.append(tr);
   }
   $('compareTable').replaceChildren(table); showDialog('compareDialog','closeDialog');
 }
@@ -380,7 +397,7 @@ function renderSuggestions() {
     return;
   }
   if (!last) return;
-  const resultProducts=safeProducts(answers.find(answer=>safeProducts(answer.products).length)?.products);
+  const resultProducts=safeProducts(last.products);
   if (resultProducts.length) {
     suggestion(t('buy'),()=>openPurchaseOptions(resultProducts[0]),true);
     suggestion(t('more'),()=>send(t('more')));
@@ -388,8 +405,9 @@ function renderSuggestions() {
   }
   (Array.isArray(last.followUps)?last.followUps:[]).slice(0,3).forEach(text=>suggestion(text,()=>send(text)));
 }
-function renderConversation() {
+function renderConversation({forceBottom=false,preserveScroll=false}={}) {
   const chat=activeChat();
+  const scroller=$('contentScroll'),oldTop=scroller.scrollTop,wasNearBottom=nearBottom();
   const previousCount=renderedMessageCounts.get(chat?.id)??chat?.messages.length??0;
   $('messages').replaceChildren();
   $('workspace').classList.toggle('has-chat',!!chat?.messages.length);
@@ -409,49 +427,72 @@ function renderConversation() {
         const retry=actionButton(t('regenerate'),'refresh',()=>regenerate(chat,index)); retry.disabled=loading; actions.append(retry);
       }
       body.append(actions);
+      const items=safeProducts(message.products); if(items.length) body.append(renderProducts(items));
+    } else if(message.role==='user') {
+      const actions=document.createElement('div'); actions.className='message-actions';
+      const edit=actionButton('Xabarni tahrirlash','edit',()=>editMessage(chat,index,node)); edit.disabled=loading; actions.append(edit);
+      const copyButton=actionButton('Xabarni nusxalash','copy',async()=>{try{await copyText(message.content);}catch(error){alert(error.message);}}); actions.append(copyButton);
+      if(index===chat.messages.length-1) { const retry=actionButton('Qayta urinib ko‘rish','refresh',()=>requestReply(chat,index)); retry.disabled=loading; actions.append(retry); }
+      body.append(actions);
     }
   });
-  const latest=[...(chat?.messages||[])].reverse().find(m=>m.role==='assistant' && safeProducts(m.products).length);
   if(chat) renderedMessageCounts.set(chat.id,chat.messages.length);
   $('shareCurrent').disabled=!chat?.messages.length;
-  products=safeProducts(latest?.products); selected.clear(); renderProducts(); renderSuggestions(); scrollBottom((chat?.messages.length||0)>previousCount);
+  renderSuggestions();
+  if(forceBottom || (!preserveScroll && wasNearBottom)) scrollBottom((chat?.messages.length||0)>previousCount);
+  else { scroller.scrollTop=oldTop; updateScrollLatest(); }
 }
 
 async function api(path, options={}, authenticated=false) {
+  const generation=authGeneration,owner=user?.id;
+  const checkOwner=()=>{if(authenticated&&(generation!==authGeneration||owner!==user?.id))throw new DOMException('Account changed','AbortError');};
   if (authenticated) await ensureSession();
+  checkOwner();
   const headers={...options.headers};
   if (options.body && !(options.body instanceof FormData)) headers['Content-Type']='application/json';
   if (authenticated) headers.Authorization=`Bearer ${session.access_token}`;
   let response=await fetch(`${BACKEND}${path}`,{...options,headers});
   if (authenticated && response.status===401) {
-    await refreshSession(); headers.Authorization=`Bearer ${session.access_token}`;
+    checkOwner();await refreshSession();checkOwner();headers.Authorization=`Bearer ${session.access_token}`;
     response=await fetch(`${BACKEND}${path}`,{...options,headers});
   }
   const data=await response.json().catch(()=>({}));
-  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  checkOwner();
+  if (!response.ok) throw Object.assign(new Error(data.error || `HTTP ${response.status}`),{status:response.status,code:data.code,product:data.product,retryAfterSeconds:data.retryAfterSeconds});
   return data;
 }
 async function refreshSession() {
   if (!session?.refresh_token) throw new Error('Session expired');
-  const data=await api('/api/auth/refresh',{method:'POST',body:JSON.stringify({refresh_token:session.refresh_token})});
-  session=data.session; user=data.user; localStorage.setItem('top_session_v1',JSON.stringify({...session,user}));
+  const generation=authGeneration,owner=user?.id,token=session.refresh_token;
+  if(refreshTask?.generation===generation)return refreshTask.promise;
+  const promise=(async()=>{
+    const data=await api('/api/auth/refresh',{method:'POST',body:JSON.stringify({refresh_token:token})});
+    if(generation!==authGeneration||owner!==user?.id||token!==session?.refresh_token)throw new DOMException('Account changed','AbortError');
+    if(data.user?.id!==owner||!data.session?.access_token)throw new Error('Invalid session refresh');
+    session=data.session;user=data.user;localStorage.setItem('top_session_v1',JSON.stringify({...session,user}));
+  })();
+  const task={generation,promise};refreshTask=task;
+  try{return await promise;}finally{if(refreshTask===task)refreshTask=null;}
 }
 async function ensureSession() { if (!session) throw new Error('Sign in required'); if ((session.expires_at||0)*1000<Date.now()+60000) await refreshSession(); }
 function syncChat(chat) {
   if (!user) return Promise.resolve();
+  const generation=authGeneration,owner=user.id;
   const previous=syncQueues.get(chat.id)||Promise.resolve();
   const next=previous.catch(()=>{}).then(async()=>{
+    if(generation!==authGeneration||owner!==user?.id)return;
     const body=JSON.stringify({title:chat.title,messages:chat.messages});
     const data=chat.remoteId
       ? await api(`/api/chats/${chat.remoteId}`,{method:'PATCH',body},true)
       : await api('/api/chats',{method:'POST',body},true);
     if (!chat.remoteId) chat.remoteId=data.chat.id;
     syncFailed=false; persist(); updateAccountUI();
-  }).catch(error=>{ syncFailed=true; updateAccountUI(); console.error('[chat sync]',error); });
+  }).catch(error=>{ if(generation!==authGeneration||owner!==user?.id||error.name==='AbortError')return;syncFailed=true;updateAccountUI();console.error('[chat sync]',error); });
   syncQueues.set(chat.id,next); return next;
 }
 async function loadRemoteChats() {
   if (!user) return;
+  const generation=authGeneration;
   try {
     const list=await api('/api/chats',{},true);
     for (const item of list.chats||[]) {
@@ -464,23 +505,32 @@ async function loadRemoteChats() {
       } else chats.push({id:crypto.randomUUID(),remoteId:item.id,title:data.chat.title,messages:data.chat.messages||[],updatedAt:data.chat.updated_at});
     }
     syncFailed=false; persist(); renderConversation(); updateAccountUI();
-  } catch(error) { syncFailed=true; updateAccountUI(); console.error('[history]',error); }
+  } catch(error) { if(generation!==authGeneration||error.name==='AbortError')return;syncFailed=true;updateAccountUI();console.error('[history]',error); }
 }
 async function enterAccount(data) {
+  if(loading)stopGeneration();
+  const generation=++authGeneration;
+  const guestSaved=user?[]:savedProducts.slice();
   const guestChats=chats.filter(chat=>chat && Array.isArray(chat.messages) && chat.messages.length);
   session=data.session; user=data.user;
   localStorage.setItem('top_session_v1',JSON.stringify({...session,user}));
+  syncSavedAccount(guestSaved);
   chats=readChats(); activeId=localStorage.getItem(activeKey())||null;
   await loadRemoteChats();
+  if(generation!==authGeneration)return;
   const existing=new Set(chats.map(chat=>chat.id));
   const imported=guestChats.filter(chat=>!existing.has(chat.id)).map(chat=>({...chat,remoteId:null}));
   chats.push(...imported);
   if (imported.length) { persist(); await Promise.all(imported.map(syncChat)); }
+  if(generation!==authGeneration)return;
   if (!activeId && imported.length) activeId=imported[0].id;
   persist(); updateAccountUI(); renderConversation();
 }
 function leaveAccount() {
+  if(loading)stopGeneration();
+  authGeneration++;
   session=null; user=null; localStorage.removeItem('top_session_v1');
+  resetSavedProducts();hideDialog('savedDialog');
   clearPendingImage(); for(const url of imageUrls.values()) URL.revokeObjectURL(url); imageUrls.clear();
   chats=[]; activeId=null; syncFailed=false;
   closeAuth(); updateAccountUI(); persist(); renderConversation();
@@ -522,9 +572,11 @@ async function resendConfirmation() {
 }
 async function submitAuth(event) {
   event.preventDefault(); $('authError').hidden=true; $('authStatus').hidden=true; $('authSubmit').disabled=true;
+  const generation=authGeneration;
   try {
     const path=authMode==='login'?'/api/auth/login':'/api/auth/signup';
     const data=await api(path,{method:'POST',body:JSON.stringify({email:$('authEmail').value.trim(),password:$('authPassword').value})});
+    if(generation!==authGeneration)return;
     if (!data.session) { sessionStorage.setItem('top_pending_confirmation_email',$('authEmail').value.trim()); $('authStatus').textContent=t('confirmEmail'); $('authStatus').hidden=false; $('resendConfirmation').hidden=false; return; }
     sessionStorage.removeItem('top_pending_confirmation_email');
     await enterAccount(data); closeAuth();
@@ -540,7 +592,7 @@ async function send(preset) {
   if (!chat) { chat={id:crypto.randomUUID(),remoteId:null,title:titleFrom(queryText),messages:[],updatedAt:new Date().toISOString()}; chats.unshift(chat); activeId=chat.id; renderedMessageCounts.set(chat.id,0); }
   const context=searchHistory(chat.messages);
   loading=true; updateSendState(); renderSuggestions();
-  requestController=new AbortController(); const sentTo=chat.id;
+  const controller=new AbortController(); requestController=controller; const sentTo=chat.id;
   let indicator=null;
   try {
     let imageId=null;
@@ -550,49 +602,84 @@ async function send(preset) {
       if (!chat.remoteId) await syncChat(chat);
       if (!chat.remoteId) throw new Error('Chatni hisobga saqlab bo‘lmadi.');
       const body=new FormData(); body.append('image',file);
-      const upload=await api(`/api/chats/${chat.remoteId}/images`,{method:'POST',body,signal:requestController.signal},true);
+      const upload=await api(`/api/chats/${chat.remoteId}/images`,{method:'POST',body,signal:controller.signal},true);
       imageId=upload.image.id; clearPendingImage();
     }
+    if(controller.signal.aborted || requestController!==controller) return;
     chat.messages.push({role:'user',content:queryText,...(imageId?{imageId}:{})}); touch(chat);
     if (user) syncChat(chat);
     $('input').value=''; $('input').style.height='auto'; updateSendState();
-    if (activeId===sentTo) { renderConversation(); indicator=addMessage('assistant loading',t('searching'),true); scrollBottom(true); }
+    if (activeId===sentTo) { renderConversation({forceBottom:true}); indicator=addMessage('assistant loading',t('searching'),true); scrollBottom(true); }
     const authSearch=!!(imageId || context.some(turn=>turn.imageId));
-    const data=await api('/api/search',{method:'POST',body:JSON.stringify({query:queryText,history:context,...(authSearch?{chatId:chat.remoteId,imageId}:{})}),signal:requestController.signal},authSearch);
+    const data=await api('/api/search',{method:'POST',body:JSON.stringify({query:queryText,history:context,...(authSearch?{chatId:chat.remoteId,imageId}:{})}),signal:controller.signal},authSearch);
+    if(controller.signal.aborted || requestController!==controller) return;
     if (Array.isArray(data.products) && typeof data.reply!=='string') data.reply=t('count')(data.products.length);
     if (typeof data.reply!=='string' || !Array.isArray(data.products)) throw new Error('Invalid response');
     chat.messages.push({role:'assistant',content:data.reply,products:safeProducts(data.products),followUps:Array.isArray(data.followUps)?data.followUps:[]});
     touch(chat); if (user) syncChat(chat);
   } catch(error) {
-    if (error.name!=='AbortError') {
+    if (!controller.signal.aborted && requestController===controller && error.name!=='AbortError') {
       if (chat.messages.at(-1)?.role==='user' && chat.messages.at(-1).content===queryText) {
         chat.messages.push({role:'assistant',content:t('error')}); touch(chat); if (user) syncChat(chat);
       } else { alert(error.message || t('error')); }
       console.error('[search]',error);
     }
   } finally {
-    indicator?.remove(); loading=false; updateSendState(); requestController=null;
-    if (activeId===sentTo) { renderConversation(); $('input').focus(); }
+    indicator?.remove();
+    if(requestController===controller) {
+      loading=false; updateSendState(); requestController=null;
+      if (activeId===sentTo) { renderConversation(); $('input').focus(); }
+    }
   }
 }
 
-async function regenerate(chat,index) {
-  if (loading || chat.messages[index]?.role!=='assistant' || chat.messages[index-1]?.role!=='user') return;
-  const question=chat.messages[index-1];
-  const context=searchHistory(chat.messages.slice(0,index-1));
+function editMessage(chat,index,node) {
+  if(loading || node.querySelector('.message-editor')) return;
+  const body=node.querySelector('.message-body'); const text=body.querySelector('.message-text'); const actions=body.querySelector('.message-actions');
+  const form=document.createElement('form'); form.className='message-editor';
+  const input=document.createElement('textarea'); input.value=chat.messages[index].content; input.maxLength=1000; input.rows=3; input.setAttribute('aria-label','Xabarni tahrirlash');
+  const buttons=document.createElement('div'); buttons.className='editor-actions';
+  const cancel=document.createElement('button'); cancel.type='button'; cancel.textContent='Bekor qilish';
+  const save=document.createElement('button'); save.type='submit'; save.className='primary'; save.textContent='Saqlash va yuborish';
+  const status=document.createElement('p'); status.className='action-status'; status.setAttribute('role','status');
+  cancel.addEventListener('click',()=>{form.remove();text.hidden=false;actions.hidden=false;});
+  input.addEventListener('input',()=>{save.disabled=!input.value.trim();});
+  form.addEventListener('submit',async event=>{
+    event.preventDefault(); if(!input.value.trim() || loading)return;
+    save.disabled=true;cancel.disabled=true;status.textContent='Yuborilmoqda…';
+    const success=await requestReply(chat,index,input.value.trim());
+    if(!success && form.isConnected){save.disabled=false;cancel.disabled=false;status.textContent='Yangi javob olinmadi. Oldingi suhbat saqlandi. Qayta urinib ko‘ring.';}
+  });
+  buttons.append(cancel,save);form.append(input,buttons,status);text.hidden=true;actions.hidden=true;body.append(form);input.focus();input.setSelectionRange(input.value.length,input.value.length);
+}
+async function requestReply(chat,questionIndex,editedText=null) {
+  if(loading || activeId!==chat.id || chat.messages[questionIndex]?.role!=='user') return false;
+  const question=chat.messages[questionIndex],isEdit=typeof editedText==='string';
+  const query=isEdit?editedText:question.content;
+  const context=searchHistory(chat.messages.slice(0,questionIndex));
   const authSearch=!!(question.imageId || context.some(turn=>turn.imageId));
   loading=true; updateSendState(); renderSuggestions();
-  const indicator=addMessage('assistant loading',t('searching'),true); scrollBottom(true);
-  requestController=new AbortController();
+  const follow=nearBottom(); const indicator=addMessage('assistant loading',t('searching'),true); if(follow&&!isEdit)scrollBottom(true);
+  const controller=new AbortController();requestController=controller;let success=false;
   try {
-    const data=await api('/api/search',{method:'POST',body:JSON.stringify({query:question.content,history:context,...(authSearch?{chatId:chat.remoteId,imageId:question.imageId}:{})}),signal:requestController.signal},authSearch);
+    const data=await api('/api/search',{method:'POST',body:JSON.stringify({query,history:context,...(authSearch?{chatId:chat.remoteId,imageId:question.imageId}:{})}),signal:controller.signal},authSearch);
+    if(controller.signal.aborted || requestController!==controller)return false;
     if(typeof data.reply!=='string' || !Array.isArray(data.products)) throw new Error('Invalid response');
-    chat.messages[index]={role:'assistant',content:data.reply,products:safeProducts(data.products),followUps:Array.isArray(data.followUps)?data.followUps:[]};
+    if(data.reason==='provider_unavailable') throw new Error(data.reply);
+    const answer={role:'assistant',content:data.reply,products:safeProducts(data.products),followUps:Array.isArray(data.followUps)?data.followUps:[]};
+    if(isEdit){chat.messages=[...chat.messages.slice(0,questionIndex),{...question,content:query},answer];if(questionIndex===0)chat.title=titleFrom(query);}
+    else if(chat.messages[questionIndex+1]?.role==='assistant')chat.messages[questionIndex+1]=answer;
+    else chat.messages.push(answer);
     touch(chat); if(user) syncChat(chat);
-    renderedMessageCounts.set(chat.id,index);
-  } catch(error) { if(error.name!=='AbortError') alert(error.message || t('error')); }
-  finally { indicator.remove(); loading=false; requestController=null; updateSendState(); if(activeId===chat.id)renderConversation(); }
+    renderedMessageCounts.set(chat.id,questionIndex+1);success=true;
+  } catch(error) { if(!isEdit && !controller.signal.aborted && error.name!=='AbortError') alert(error.message || t('error')); }
+  finally {
+    indicator.remove();
+    if(requestController===controller){loading=false;requestController=null;updateSendState();if(activeId===chat.id && (success||!isEdit))renderConversation({preserveScroll:isEdit});else renderSuggestions();}
+  }
+  return success;
 }
+async function regenerate(chat,index) { if(chat.messages[index]?.role==='assistant')return requestReply(chat,index-1); }
 
 let sharedRevision=null;
 async function renderSharedChat() {
@@ -630,7 +717,9 @@ async function renderSharedChat() {
   }
 }
 
-$('send').addEventListener('click',()=>send());
+$('send').addEventListener('click',()=>loading?stopGeneration():send());
+$('scrollLatest').addEventListener('click',()=>scrollBottom(true));
+$('contentScroll').addEventListener('scroll',updateScrollLatest,{passive:true});
 $('input').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&event.keyCode!==229){event.preventDefault();send();}});
 $('input').addEventListener('input',()=>{ $('input').style.height='auto'; $('input').style.height=Math.min($('input').scrollHeight,120)+'px'; updateSendState(); });
 $('openSearch').addEventListener('click',openChatSearch);
@@ -645,7 +734,7 @@ $('settingsButton').addEventListener('click',openSettings); $('settingsTop').add
 $('closeSettings').addEventListener('click',()=>hideDialog('settingsDialog'));
 $('topMore').addEventListener('click',toggleTopMenu); $('brandButton').addEventListener('click',toggleTopMenu);
 $('shareCurrent').addEventListener('click',()=>{closeTopMenu();const chat=activeChat();if(chat?.messages.length)openShare(chat);});
-$('compareAction').addEventListener('click',showCompare); $('closeDialog').addEventListener('click',()=>hideDialog('compareDialog'));
+$('closeDialog').addEventListener('click',()=>hideDialog('compareDialog'));
 $('closePurchase').addEventListener('click',closePurchaseOptions);
 $('accountButton').addEventListener('click',openAuth); $('closeAuth').addEventListener('click',closeAuth);
 $('authForm').addEventListener('submit',submitAuth);
@@ -666,9 +755,9 @@ $('revokeShare').addEventListener('click',revokeShare);
 document.querySelectorAll('.dialog').forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)hideDialog(dialog.id);}));
 document.addEventListener('click',event=>{if(!event.target.closest('.history-menu-wrap'))document.querySelectorAll('.history-menu').forEach(node=>node.hidden=true);if(!event.target.closest('#topMenu,#topMore,#brandButton'))closeTopMenu();});
 document.addEventListener('keydown',event=>{
-  const dialog=[...document.querySelectorAll('.dialog.open')].at(-1);
+  const dialog=openDialogs.length?$(openDialogs.at(-1)):null;
   if(event.key==='Escape') { if(dialog)hideDialog(dialog.id);else{closeTopMenu();document.querySelectorAll('.history-menu').forEach(node=>node.hidden=true);closeRailOnMobile();} }
-  if(event.key==='Tab'&&dialog) { const focusable=[...dialog.querySelectorAll('button:not(:disabled),a[href],input:not([hidden]),textarea')].filter(node=>node.getClientRects().length); const first=focusable[0],last=focusable.at(-1); if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();} }
+  if(event.key==='Tab'&&dialog) { const focusable=[...dialog.querySelectorAll('button:not(:disabled),a[href],input:not([hidden]),textarea')].filter(node=>node.getClientRects().length); const first=focusable[0],last=focusable.at(-1); if(!dialog.contains(document.activeElement)){event.preventDefault();(event.shiftKey?last:first)?.focus();}else if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();} }
   if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'&&!dialog){event.preventDefault();openChatSearch();}
 });
 window.addEventListener('pagehide',()=>{ if(!user){ chats=[]; activeId=null; } });
@@ -677,6 +766,7 @@ window.addEventListener('pageshow',event=>{ if(event.persisted&&!user) newChat()
 setLanguage(lang);
 handleAuthCallback();
 updateSendState();
+initSavedProducts();
 if(matchMedia('(min-width:721px)').matches) openRail(); else closeRail();
 requestAnimationFrame(()=>$('shell').classList.remove('booting'));
 new ResizeObserver(entries=>{ $('workspace').style.setProperty('--composer-space',`${Math.ceil(entries[0].target.getBoundingClientRect().height+42)}px`); }).observe(document.querySelector('.composer'));
