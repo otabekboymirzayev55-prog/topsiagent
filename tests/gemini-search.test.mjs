@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { retailerSources, searchWithGemini } from '../gemini-search.js';
+import { canonicalRetailUrl, retailerSources, searchWithGemini } from '../gemini-search.js';
 import { trustedRetailUrl, verifiedReply, verifyProductLinks } from '../search-agent.js';
 
 const helpers = { trustedRetailUrl, verifiedReply, verifyProductLinks };
@@ -53,4 +53,7 @@ test('search sources drop untrusted URLs and uncertain snippet prices', () => {
   ]},trustedRetailUrl);
   assert.equal(sources.length,1);
   assert.equal(sources[0].price,null);
+  assert.equal(canonicalRetailUrl('https://uzum.uz/uz/product/qizil-egar/reviews?srsltid=abc'),
+    'https://uzum.uz/uz/product/qizil-egar');
+  assert.equal(canonicalRetailUrl('https://uzum.uz/uz/category/egar'),null);
 });
