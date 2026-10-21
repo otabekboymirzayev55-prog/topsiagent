@@ -118,7 +118,9 @@ export async function searchWithGemini(query, history, images, imageId, helpers,
   const serpKey = options.serpKey || process.env.SERPAPI_API_KEY;
   if (!geminiKey || !serpKey) throw new Error("Gemini product search is not configured");
   const request = options.request || fetch;
-  const needsPlan = Boolean(imageId) || query.length < 30 || /^(?:shu|buni|shuni|uni|farqi|baribir|this|that|эту|это)\b/i.test(query);
+  // Retailer searches need a compact product query, especially when a user
+  // writes a conversational request or excludes accessories.
+  const needsPlan = true;
   let searchQuery = query;
   if (needsPlan) {
     const parts = [
@@ -129,7 +131,7 @@ export async function searchWithGemini(query, history, images, imageId, helpers,
     const plan = await askGemini(`You are Top, a multilingual shopping assistant. Read the entire conversation and any images.
 Reply in the user's language. If the product category is unknown, ask ONE short question and return {"type":"clarify","reply":"...","followUps":["..."]}.
 Otherwise return {"type":"search","searchQuery":"one concise web query for real product pages from trusted shops"}.
-Budget and country are optional. Preserve all explicit constraints and exclusions. For Uzbek requests without a stated country, favor Uzbekistan shops. Do not ask again after "farqi yo'q". Do not claim a purchase was made.`, parts, geminiKey, request);
+Budget and country are optional. Preserve all explicit constraints and exclusions. For Uzbek requests without a stated country, favor Uzbekistan shops. Include a site:uzum.uz, site:asaxiy.uz, or site:olcha.uz operator for Uzbekistan unless the user named another shop. Remove conversational filler from the search query. Exclude accessories with a - term when the user explicitly rejects them. Do not ask again after "farqi yo'q". Do not claim a purchase was made.`, parts, geminiKey, request);
     if (plan?.type === "clarify") return {
       type: "clarify", reply: String(plan.reply || "Qaysi mahsulotni qidiryapsiz?").slice(0, 600), products: [],
       followUps: (Array.isArray(plan.followUps) ? plan.followUps : []).filter(x => typeof x === "string").slice(0, 3)
