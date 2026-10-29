@@ -34,6 +34,17 @@ test('a follow-up keeps the shown products and opens the selected store option',
   assert.equal(result.products[0].title, 'Sport ryukzak');
   assert.match(result.reply, /Xarid variantlari/);
   assert.match(result.reply, /avtomatik xarid hozircha tayyor emas/);
+  const detail=resolveProductFollowUp('birinchi variant haqida ko‘proq ayt, havolasini ko‘rsat',history);
+  assert.equal(detail.products[0].title,'Sport ryukzak');
+  assert.match(detail.reply,/Sport ryukzak/);
+  assert.match(detail.reply,/havolasi quyidagi kartada/);
+  assert.doesNotMatch(detail.reply,/avtomatik xarid/);
+});
+
+test('unverified prices never claim to meet a stated budget',()=>{
+  const reply=verifiedReply('maktab ryukzagi 300 000 so‘mgacha',true,[{price:null}]);
+  assert.match(reply,/narxlar tasdiqlanmadi/i);
+  assert.match(reply,/Budjetingizga mosligini/);
 });
 
 test('standalone exclusions ask a follow-up without a product search', async () => {

@@ -96,6 +96,26 @@ test('search sources drop untrusted URLs and uncertain snippet prices', () => {
   assert.equal(directProductPage('https://www.amazon.com/dp/B0CHX1W1XY'),true);
   assert.equal(directProductPage('https://www.amazon.co.uk/dp/B0CHX1W1XY'),true);
   assert.equal(directProductPage('https://uzum.uz/uz/product/suv-otkazmaydigan-ryukzak-1286039?skuId=4103052'),true);
+  assert.equal(directProductPage('https://asaxiy.uz/product/kompyutery-i-orgtehnika/noutbuki/sumki-dlya-noutbukov/brand=xiaomi/tip-28=ryukzak'),false);
+});
+
+test('school backpack selection drops laptop-only listings',async()=>{
+  let modelCalls=0;
+  const request=async url=>{
+    if(String(url).includes('generativelanguage')){
+      modelCalls++;
+      return model(modelCalls===1?{type:'search',searchQuery:'maktab ryukzak site:uzum.uz'}:{products:[{sourceId:1},{sourceId:2}]});
+    }
+    if(String(url).includes('serpapi'))return json({organic_results:[
+      {title:'Noutbuk uchun ryukzak',link:'https://uzum.uz/uz/product/noutbuk-ryukzagi-123456',snippet:'Laptop bag'},
+      {title:'Maktab uchun ryukzak',link:'https://uzum.uz/uz/product/maktab-ryukzagi-654321',snippet:'Maktab sumkasi'}
+    ]});
+    return {status:200,headers:new Headers()};
+  };
+  const result=await searchWithGemini('Maktab uchun ryukzak kerak',[],new Map(),null,helpers,
+    {geminiKey:'test',serpKey:'test',request});
+  assert.equal(result.products.length,1);
+  assert.equal(result.products[0].title,'Maktab uchun ryukzak');
 });
 
 test('a specific request never repeats an unsupported stock claim', async () => {
