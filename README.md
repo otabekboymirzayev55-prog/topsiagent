@@ -19,7 +19,7 @@ TopAgent is a conversational product finder. The responsive web interface asks f
 3. Run `supabase-chats.sql` in the project's Supabase SQL Editor. It creates the account chat tables, private `chat-images` bucket, share records, and image cleanup queue.
 4. Run `npm start` for the API.
 5. Open `frontend/index.html` in a browser or serve `frontend/` with a static server.
-6. Run `npm test` for the search and interface smoke tests. The browser test uses installed Chrome on Windows; set `TOPAGENT_BROWSER_PATH` to another Chrome or Chromium executable when needed.
+6. Run `npm test` for portable unit and contract tests; run `npm run test:browser` separately for the Chrome interface smoke test. The browser test uses installed Chrome on Windows; set `TOPAGENT_BROWSER_PATH` to another Chrome or Chromium executable when needed.
 
 ## Gemini search pilot
 
